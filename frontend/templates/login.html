@@ -5,43 +5,60 @@
 <div class="centered-page">
   <div class="card login-card">
     <div class="brand brand-centered">
-      <span class="brand-mark">JX</span>
-      <h1 data-i18n="login.title">JointX</h1>
+      <h1>Joint<b style="color:var(--color-primary)">X</b></h1>
     </div>
-    <select id="login-language-select" class="lang-select" data-i18n-lang-select aria-label="Language" style="margin-bottom:12px">
-      {% for code, label in supported_languages.items() %}
-      <option value="{{ code }}">{{ label }}</option>
-      {% endfor %}
-    </select>
-    <p class="subtitle" data-i18n="login.subtitle">AI-Assisted Early Detection of OA Risk Markers</p>
-    {% if demo_mode %}
-    <div class="banner banner-info" data-i18n="login.demo_banner">DEMO MODE ENABLED — camera/IMU data will be simulated when hardware is unavailable.</div>
-    {% endif %}
+    <p class="subtitle" data-i18n="login.subtitle">Secure sign-in · role-based access</p>
+
     <form id="login-form">
-      <label data-i18n="login.username">Username</label>
+      <label data-i18n="common.language">Language</label>
+      <select id="login-language-select" data-i18n-lang-select aria-label="Language">
+        {% for code, label in supported_languages.items() %}
+        <option value="{{ code }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <label data-i18n="login.username">Healthcare Worker ID</label>
       <input type="text" id="username" name="username" autocomplete="username" required>
-      <label data-i18n="login.password">Password</label>
+
+      <label data-i18n="login.password">Password / PIN</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required>
+
+      <label data-i18n="login.role">Role</label>
+      <select id="login-role" required>
+        <option value="Healthcare Worker" data-i18n="role.worker">Healthcare Worker</option>
+        <option value="Doctor / Reviewer" data-i18n="role.reviewer">Doctor / Reviewer</option>
+        <option value="Administrator" data-i18n="role.admin">Administrator</option>
+      </select>
+
       <button type="submit" class="btn btn-primary btn-block" data-i18n="login.button">Log in</button>
-      <p class="hint" data-i18n="login.demo_hint">Default demo login: admin / changeme123</p>
       <p id="login-error" class="error-text"></p>
     </form>
+
+    <div class="banner banner-info" style="margin-top:16px">
+      <strong data-i18n="login.portal_notice_title">Role-based portal:</strong>
+      <span data-i18n="login.portal_notice_body">Healthcare Workers capture screenings; Doctors/Reviewers review and refer flagged cases; Administrators manage system operations.</span>
+    </div>
+    <p class="hint" style="text-align:center;margin-top:12px">
+      <span data-i18n="login.no_account">New here?</span>
+      <a href="/register" data-i18n="login.register_link">Register an account</a>
+    </p>
   </div>
 </div>
 {% endblock %}
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script>
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
+  const role = document.getElementById('login-role').value;
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
   try {
-    const res = await JointX.api('/api/auth/login', 'POST', {username, password});
+    const res = await JointX.api('/api/auth/login', 'POST', {username, password, role});
     if (res.success) {
-      window.location.href = '/dashboard';
+      const landing = { worker: '/patients/new', reviewer: '/patients', admin: '/dashboard' };
+      window.location.href = landing[res.data.role_tier] || '/dashboard';
     } else {
       errEl.textContent = res.error || 'Login failed';
     }

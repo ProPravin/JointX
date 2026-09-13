@@ -71,8 +71,9 @@ def run_gait_test(screening_id: int, is_demo: bool = None, noisy_demo: bool = Fa
             """INSERT INTO gait_features
                (screening_id, is_demo, data_quality_ok, frames_used, mean_visibility,
                 cadence, step_time, stride_time, walking_speed, knee_angle_rom,
+                left_knee_rom, right_knee_rom,
                 stance_swing_ratio, left_right_asymmetry, gait_cycle_variability, raw_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 screening_id,
                 int(is_demo),
@@ -84,6 +85,8 @@ def run_gait_test(screening_id: int, is_demo: bool = None, noisy_demo: bool = Fa
                 features.get("stride_time"),
                 features.get("walking_speed"),
                 features.get("knee_angle_rom"),
+                features.get("left_knee_rom"),
+                features.get("right_knee_rom"),
                 features.get("stance_swing_ratio"),
                 features.get("left_right_asymmetry"),
                 features.get("gait_cycle_variability"),

@@ -31,6 +31,7 @@ def render_text_report(screening_id: int) -> str:
         f"  Data quality OK: {gait.get('data_quality_ok')}",
         f"  Cadence: {gait.get('cadence', 'N/A')}  Left-right asymmetry: {gait.get('left_right_asymmetry', 'N/A')}%",
         f"  Knee angle ROM: {gait.get('knee_angle_rom', 'N/A')}°  Stride time: {gait.get('stride_time', 'N/A')}s",
+        f"  Left knee ROM: {gait.get('left_knee_rom', 'N/A')}°  Right knee ROM: {gait.get('right_knee_rom', 'N/A')}°",
         "-" * 60,
         "IMU FEATURES" + (" (DEMO DATA)" if imu.get("is_demo") else ""),
         f"  Data quality OK: {imu.get('data_quality_ok')}",

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from backend.services import questionnaire_service, screening_service
-from backend.utils.security import login_required
+from backend.utils.security import login_required, require_role
 from backend.utils.validators import require_fields
 from backend.utils.helpers import api_success
 
@@ -10,6 +10,7 @@ questionnaire_bp = Blueprint("questionnaire", __name__, url_prefix="/api/questio
 
 @questionnaire_bp.route("", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def submit_questionnaire():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])

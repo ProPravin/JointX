@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify
 
 from backend.services import imu_service
-from backend.utils.security import login_required
+from backend.utils.security import login_required, require_role
 from backend.utils.helpers import api_success
 from database.database import get_cursor
 from config.settings import Config
@@ -11,6 +11,7 @@ device_bp = Blueprint("device", __name__, url_prefix="/api/device-status")
 
 @device_bp.route("", methods=["GET"])
 @login_required
+@require_role("worker", "admin")
 def device_status():
     imu_status = imu_service.get_device_status()
 

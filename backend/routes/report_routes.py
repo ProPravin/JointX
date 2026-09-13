@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, Response, session
 
 from backend.services.report_service import build_report
 from backend.services.sync_service import enqueue_screening_for_sync
 from backend.services.screening_service import complete_screening
+from backend.services import audit_service
 from backend.utils.security import login_required
 from backend.utils.helpers import api_success
 from reports.report_generator import render_text_report
@@ -29,4 +30,5 @@ def get_report_text(screening_id):
 def finalize_report(screening_id):
     complete_screening(screening_id)
     enqueue_screening_for_sync(screening_id)
+    audit_service.log_action(session.get("worker_id"), "REPORT_FINALIZED", "screening", screening_id)
     return jsonify(api_success(message="Screening completed and queued for sync"))

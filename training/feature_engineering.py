@@ -17,8 +17,16 @@ from config.model_config import RISK_LABELS
 
 
 def build_feature_table(df: pd.DataFrame) -> pd.DataFrame:
-    cols = ["subject_id"] + FEATURE_NAMES + ["risk_label"]
+    # label_source/sample_weight/is_blinded come from export_dataset.py (spec:
+    # Data Integrity #A1) and must survive into the final feature table so
+    # train.py can weight samples and validation/protocols.py can filter to
+    # blinded-only rows for the test split. Tolerate older datasets exported
+    # before these columns existed (sample_weight defaults to 1.0, unweighted).
+    provenance_cols = [c for c in ("label_source", "sample_weight", "is_blinded") if c in df.columns]
+    cols = ["subject_id"] + FEATURE_NAMES + ["risk_label"] + provenance_cols
     out = df[cols].copy()
+    if "sample_weight" not in out.columns:
+        out["sample_weight"] = 1.0
     out["risk_label_idx"] = out["risk_label"].apply(
         lambda v: RISK_LABELS.index(v) if v in RISK_LABELS else None
     )

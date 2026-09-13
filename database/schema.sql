@@ -5,15 +5,18 @@
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS healthcare_workers (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    username        TEXT NOT NULL UNIQUE,
-    password_hash   TEXT NOT NULL,
-    full_name       TEXT NOT NULL,
-    role            TEXT NOT NULL DEFAULT 'ASHA',  -- ASHA/ANM/CHO/PHC_STAFF/ADMIN
-    facility_name   TEXT,
-    language        TEXT NOT NULL DEFAULT 'en',  -- UI language preference (see config/roles.py callers)
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    is_active       INTEGER NOT NULL DEFAULT 1
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    username                TEXT NOT NULL UNIQUE,
+    password_hash           TEXT NOT NULL,
+    full_name               TEXT NOT NULL,
+    role                    TEXT NOT NULL DEFAULT 'ASHA',  -- ASHA/ANM/CHO/PHC_STAFF/DOCTOR/ADMIN
+    facility_name           TEXT,
+    language                TEXT NOT NULL DEFAULT 'en',  -- UI language preference (see config/roles.py callers)
+    created_by              INTEGER REFERENCES healthcare_workers(id),  -- admin who provisioned this account (NULL for the first/CLI-created admin)
+    failed_login_attempts   INTEGER NOT NULL DEFAULT 0,
+    locked_until            TEXT,   -- set after MAX_FAILED_LOGIN_ATTEMPTS; login refused until this time passes
+    created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+    is_active               INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS patients (
@@ -26,6 +29,7 @@ CREATE TABLE IF NOT EXISTS patients (
     weight_kg           REAL,
     village_or_area      TEXT,
     contact_phone       TEXT,
+    facility_name       TEXT,   -- copied from the registering worker at creation time; used to scope Healthcare Worker access to their own facility
     registered_by       INTEGER REFERENCES healthcare_workers(id),
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
@@ -69,6 +73,8 @@ CREATE TABLE IF NOT EXISTS gait_features (
     stride_time             REAL,
     walking_speed           REAL,
     knee_angle_rom          REAL,
+    left_knee_rom           REAL,   -- display/report only, not part of the ML feature vector
+    right_knee_rom          REAL,   -- display/report only, not part of the ML feature vector
     stance_swing_ratio      REAL,
     left_right_asymmetry    REAL,
     gait_cycle_variability  REAL,
@@ -123,10 +129,16 @@ CREATE TABLE IF NOT EXISTS fused_features (
 CREATE TABLE IF NOT EXISTS predictions (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     screening_id        INTEGER NOT NULL UNIQUE REFERENCES screenings(id) ON DELETE CASCADE,
-    risk_label          TEXT NOT NULL,       -- LOW / MODERATE / HIGH
-    risk_score          REAL,                -- model probability, if available
+    risk_label          TEXT NOT NULL,       -- LOW / MODERATE / HIGH / REFUSED
+    risk_score          REAL,                -- model probability, if available (NULL when refused, or when uncalibrated -- see A4)
     model_version       TEXT,
     is_prototype        INTEGER NOT NULL DEFAULT 1,  -- 1 = unvalidated prototype/demo model
+    -- Refusal gate (spec #A2): fewer than 2 of 4 feature blocks present, or
+    -- overall capture quality below threshold. A refused screening is
+    -- recorded here (never silently discarded) so it is visible in the
+    -- dashboard as its own state, distinct from a low-risk prediction.
+    refused             INTEGER NOT NULL DEFAULT 0,
+    refusal_reason      TEXT,
     created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -138,15 +150,31 @@ CREATE TABLE IF NOT EXISTS shap_explanations (
 );
 
 CREATE TABLE IF NOT EXISTS healthcare_reviews (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    screening_id        INTEGER NOT NULL UNIQUE REFERENCES screenings(id) ON DELETE CASCADE,
-    reviewed_by         INTEGER REFERENCES healthcare_workers(id),
-    notes               TEXT,
-    agrees_with_model   INTEGER,   -- 1/0/NULL
-    clinician_label     TEXT,      -- LOW/MODERATE/HIGH, the reviewer's own ground-truth
-                                    -- call for this screening (required for training data
-                                    -- when disagreeing with the model; optional otherwise)
-    created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    screening_id            INTEGER NOT NULL UNIQUE REFERENCES screenings(id) ON DELETE CASCADE,
+    reviewed_by             INTEGER REFERENCES healthcare_workers(id),
+    notes                   TEXT,
+    agrees_with_model       INTEGER,   -- 1/0/NULL
+    clinician_label         TEXT,      -- LOW/MODERATE/HIGH, the reviewer's own ground-truth
+                                        -- call for this screening (required for training data
+                                        -- when disagreeing with the model; optional otherwise)
+    -- Provenance of clinician_label, so training can weight and filter by
+    -- evidentiary strength instead of treating every label as equally trustworthy.
+    -- model_confirmed means "reviewer just clicked agree" and is EXCLUDED from
+    -- training/test by default (see training/export_dataset.py) -- it is not
+    -- independent ground truth, it is the model grading its own homework.
+    label_source            TEXT CHECK (label_source IN ('kl_grade', 'acr_clinical', 'clinician_impression', 'model_confirmed')),
+    kl_grade_value          INTEGER CHECK (kl_grade_value BETWEEN 0 AND 4),  -- Kellgren-Lawrence grade from radiograph, when available
+    radiograph_ref          TEXT,      -- external reference/ID for the radiograph backing kl_grade_value
+    acr_criteria_json       TEXT,      -- structured ACR clinical criteria checklist backing acr_clinical
+    -- Blinded review (spec: Production-grade RBAC / data integrity #A1): the
+    -- reviewer's risk-level pick BEFORE the model's prediction is revealed to
+    -- them. Only a blinded label is eligible as a gold-standard TEST label --
+    -- a label recorded after the prediction was seen is contaminated by
+    -- automation bias and may only be used (if at all) as a weak training signal.
+    reviewer_label_blind    TEXT CHECK (reviewer_label_blind IN ('LOW', 'MODERATE', 'HIGH')),
+    prediction_revealed_at  TEXT,      -- set the moment the model's prediction was shown to this reviewer
+    created_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS referrals (
@@ -173,6 +201,16 @@ CREATE TABLE IF NOT EXISTS sync_queue (
     synced_at       TEXT
 );
 
+CREATE TABLE IF NOT EXISTS audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    worker_id       INTEGER REFERENCES healthcare_workers(id),  -- NULL for failed logins with an unknown/bad username
+    action          TEXT NOT NULL,   -- e.g. LOGIN_SUCCESS / LOGIN_FAILED / LOGOUT / WORKER_CREATED / WORKER_DISABLED / WORKER_ENABLED / PASSWORD_RESET / REVIEW_SUBMITTED / REFERRAL_UPDATED / REPORT_FINALIZED
+    entity_type     TEXT,            -- e.g. 'healthcare_worker', 'screening', 'referral'
+    entity_id       INTEGER,
+    details_json    TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS device_status (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     device_type     TEXT NOT NULL,   -- CAMERA / IMU_LEFT / IMU_RIGHT / ESP32
@@ -184,3 +222,5 @@ CREATE TABLE IF NOT EXISTS device_status (
 CREATE INDEX IF NOT EXISTS idx_screenings_patient ON screenings(patient_id);
 CREATE INDEX IF NOT EXISTS idx_referrals_screening ON referrals(screening_id);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
+CREATE INDEX IF NOT EXISTS idx_audit_log_worker ON audit_log(worker_id);
+CREATE INDEX IF NOT EXISTS idx_patients_facility ON patients(facility_name);

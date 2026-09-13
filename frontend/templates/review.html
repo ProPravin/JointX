@@ -2,15 +2,51 @@
 {% block title %}Review — JointX{% endblock %}
 {% block content %}
 <div class="page-header"><h1>Healthcare-Worker Review</h1></div>
-<div class="card form-card">
-  <p>Review the AI risk result and record your clinical judgement notes below.</p>
+
+<div class="card form-card" id="blind-step">
+  <h2>Step 1 — Your Assessment (Blind)</h2>
+  <p>Record your own clinical impression of this patient's OA risk <b>before</b> seeing the model's prediction. This keeps your judgement independent, so it can count as reliable ground truth for future model training.</p>
+  <form id="blind-form">
+    <label>Your risk category</label>
+    <select id="reviewer_label_blind" required>
+      <option value="">— Select —</option>
+      <option value="LOW">LOW</option>
+      <option value="MODERATE">MODERATE</option>
+      <option value="HIGH">HIGH</option>
+    </select>
+    <button type="submit" class="btn btn-primary btn-block">Submit Blind Assessment &amp; Reveal Model Prediction</button>
+    <p id="blind-error" class="error-text"></p>
+  </form>
+</div>
+
+<div class="card" id="revealed-step" style="display:none;">
+  <h2>Model Prediction</h2>
+  <p>Your blind assessment: <b id="blind-label-display"></b></p>
+  <p>Model's prediction: <b id="model-label-display"></b></p>
+</div>
+
+<div class="card form-card" id="finalize-step" style="display:none;">
+  <h2>Step 2 — Finalize Review</h2>
   <form id="review-form">
     <label>Do you agree with the model's risk category?</label>
     <select id="agrees_with_model">
       <option value="1">Yes, I agree</option>
       <option value="0">No, I disagree</option>
     </select>
-    <label id="clinician-label-label">Your clinical risk category (required if you disagree; used as ground truth for future model training)</label>
+    <label>Label source (evidence backing your final call)</label>
+    <select id="label_source">
+      <option value="clinician_impression">Clinician impression (no radiograph/ACR criteria)</option>
+      <option value="kl_grade">Kellgren-Lawrence grade (radiograph available)</option>
+      <option value="acr_clinical">ACR clinical criteria</option>
+      <option value="model_confirmed">Model confirmed (agree, no independent evidence)</option>
+    </select>
+    <div id="kl-grade-row" style="display:none;">
+      <label>KL grade (0-4)</label>
+      <input type="number" id="kl_grade_value" min="0" max="4">
+      <label>Radiograph reference</label>
+      <input type="text" id="radiograph_ref">
+    </div>
+    <label id="clinician-label-label">Your clinical risk category (required unless "Model confirmed")</label>
     <select id="clinician_label">
       <option value="">— Not specified —</option>
       <option value="LOW">LOW</option>
@@ -50,6 +86,33 @@
 const screeningId = {{ screening_id }};
 document.getElementById('report-link').href = '/reports/' + screeningId;
 
+document.getElementById('label_source').addEventListener('change', (e) => {
+  document.getElementById('kl-grade-row').style.display = e.target.value === 'kl_grade' ? '' : 'none';
+});
+
+document.getElementById('blind-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const blindLabel = document.getElementById('reviewer_label_blind').value;
+  const res = await JointX.api('/api/review/blind', 'POST', {
+    screening_id: screeningId,
+    reviewer_label_blind: blindLabel,
+  });
+  if (!res.success) {
+    document.getElementById('blind-error').textContent = res.error;
+    return;
+  }
+  const revealRes = await JointX.api(`/api/review/${screeningId}/reveal`, 'POST', {});
+  if (!revealRes.success) {
+    document.getElementById('blind-error').textContent = revealRes.error;
+    return;
+  }
+  document.getElementById('blind-label-display').textContent = blindLabel;
+  document.getElementById('model-label-display').textContent = revealRes.data.risk_label;
+  document.getElementById('blind-step').style.display = 'none';
+  document.getElementById('revealed-step').style.display = '';
+  document.getElementById('finalize-step').style.display = '';
+});
+
 document.getElementById('review-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const clinicianLabel = document.getElementById('clinician_label').value;
@@ -58,6 +121,9 @@ document.getElementById('review-form').addEventListener('submit', async (e) => {
     notes: document.getElementById('notes').value,
     agrees_with_model: parseInt(document.getElementById('agrees_with_model').value, 10),
     clinician_label: clinicianLabel || null,
+    label_source: document.getElementById('label_source').value,
+    kl_grade_value: document.getElementById('kl_grade_value').value || null,
+    radiograph_ref: document.getElementById('radiograph_ref').value || null,
   };
   const res = await JointX.api('/api/review', 'POST', payload);
   document.getElementById('review-error').textContent = res.success ? 'Review saved.' : res.error;

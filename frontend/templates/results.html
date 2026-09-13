@@ -35,6 +35,15 @@
   </div>
 </div>
 
+<div class="card section-gap" id="lr-card" style="display:none">
+  <h2>Left vs Right Knee Comparison</h2>
+  <div class="kneecols">
+    <div class="kneecol"><h4>LEFT KNEE</h4><div class="kv"><span>ROM</span><b id="lr-left-rom">—</b></div></div>
+    <div class="kneecol"><h4>RIGHT KNEE</h4><div class="kv"><span>ROM</span><b id="lr-right-rom">—</b></div></div>
+  </div>
+  <p class="hint" style="margin-top:10px">Computed from camera-tracked knee angle per side. The IMU pair on this device measures a single limb (thigh + shank) for relative joint ROM and does not currently provide an independent left-vs-right IMU comparison — attaching a second IMU pair to the other limb would be required for that.</p>
+</div>
+
 <div class="card banner banner-disclaimer">
   <p><strong>{{ disclaimer }}</strong></p>
   <p id="further-eval-text"></p>
@@ -78,6 +87,19 @@ async function loadResults() {
   if (predRes.success) {
     const p = predRes.data;
     const box = document.getElementById('risk-label-box');
+
+    if (p.refused) {
+      // Refusal gate fired (spec: Data Integrity #A2) -- there was not
+      // enough captured data/quality to trust a prediction. This is a
+      // distinct, honestly-labelled outcome, never rendered as a risk level.
+      box.textContent = 'Insufficient capture quality — screening not scored';
+      box.className = 'risk-label-box risk-refused';
+      document.getElementById('risk-score-text').textContent = p.refusal_reason || '';
+      _speechState.riskLabel = '';
+      _speechState.riskScore = null;
+      return;
+    }
+
     box.textContent = JointXI18n.t('common.' + p.risk_label.toLowerCase());
     box.className = 'risk-label-box risk-' + p.risk_label.toLowerCase();
     document.getElementById('risk-score-text').textContent = p.risk_score != null ? ('Model score: ' + p.risk_score) : '';
@@ -122,6 +144,13 @@ async function loadResults() {
       <dt>${JointXI18n.t('results.imu_quality')}</dt><dd>${s.imu_features ? s.imu_features.data_quality_ok : '—'}</dd>
       <dt>${JointXI18n.t('results.functional_quality')}</dt><dd>${s.functional_features ? [s.functional_features.sit_to_stand_ok, s.functional_features.squat_ok, s.functional_features.balance_ok, s.functional_features.turn_ok].filter(Boolean).length + '/4' : '0/4'}</dd>
     `;
+
+    const gait = s.gait_features;
+    if (gait && gait.left_knee_rom != null && gait.right_knee_rom != null) {
+      document.getElementById('lr-card').style.display = 'block';
+      document.getElementById('lr-left-rom').textContent = gait.left_knee_rom + '°';
+      document.getElementById('lr-right-rom').textContent = gait.right_knee_rom + '°';
+    }
   }
 }
 loadResults();

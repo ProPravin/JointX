@@ -28,10 +28,13 @@ def evaluate(model_path: str, test_df: pd.DataFrame) -> dict:
     booster = xgb.Booster()
     booster.load_model(model_path)
 
-    X = test_df[FEATURE_NAMES].fillna(0.0).values
+    # Missing values stay NaN through evaluation too (spec: Data Integrity
+    # #A2) -- filling with 0.0 here would silently score refused-quality
+    # captures as if every sensor read cleanly, corrupting the reported metrics.
+    X = test_df[FEATURE_NAMES].astype(float).values
     y_true = test_df["risk_label_idx"].values
 
-    dtest = xgb.DMatrix(X, feature_names=FEATURE_NAMES)
+    dtest = xgb.DMatrix(X, feature_names=FEATURE_NAMES, missing=float("nan"))
     probs = booster.predict(dtest)  # shape (n, n_classes)
     y_pred = np.argmax(probs, axis=1)
 

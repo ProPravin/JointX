@@ -24,6 +24,21 @@ def new_csrf_token() -> str:
     return secrets.token_hex(16)
 
 
+def validate_password_strength(password: str):
+    """
+    Raises ValidationError if the password doesn't meet minimum production
+    complexity: at least 8 characters, containing at least one letter and
+    one digit. Deliberately not tied to a specific character-class regex
+    beyond that so it doesn't reject legitimate passphrases.
+    """
+    from backend.utils.validators import ValidationError
+
+    if not password or len(password) < 8:
+        raise ValidationError("Password must be at least 8 characters long")
+    if not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
+        raise ValidationError("Password must contain at least one letter and one digit")
+
+
 def login_required(view_func):
     """Decorator for API routes that require an authenticated healthcare worker."""
 

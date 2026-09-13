@@ -52,9 +52,15 @@ def dashboard_summary():
         recent_screenings = [dict(r) for r in cur.fetchall()]
 
         cur.execute(
-            """SELECT risk_label, COUNT(*) c FROM predictions GROUP BY risk_label"""
+            """SELECT risk_label, COUNT(*) c FROM predictions WHERE refused = 0 GROUP BY risk_label"""
         )
         risk_distribution = {r["risk_label"]: r["c"] for r in cur.fetchall()}
+
+        # Refused screenings (spec: Data Integrity #A2) are recorded, never
+        # silently discarded, and shown as their own dashboard state distinct
+        # from a low-risk prediction.
+        cur.execute("SELECT COUNT(*) c FROM predictions WHERE refused = 1")
+        refused_screenings = cur.fetchone()["c"]
 
         cur.execute(
             "SELECT COUNT(*) c FROM referrals WHERE status IN ('REFERRAL_CREATED','PENDING')"
@@ -77,6 +83,7 @@ def dashboard_summary():
         "total_screenings": total_screenings,
         "recent_screenings": recent_screenings,
         "risk_distribution": risk_distribution,
+        "refused_screenings": refused_screenings,
         "pending_referrals": pending_referrals,
         "follow_up_cases": follow_up_cases,
         "unsynced_records": unsynced,

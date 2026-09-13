@@ -26,6 +26,14 @@ class Config:
 
     # Session
     SESSION_LIFETIME_MINUTES = int(os.environ.get("JOINTX_SESSION_MINUTES", "60"))
+    # Only set this true once the app is actually served over HTTPS — a
+    # secure-only cookie is silently dropped by browsers over plain HTTP,
+    # which would make login appear to succeed but never actually persist.
+    SESSION_COOKIE_SECURE = os.environ.get("JOINTX_SESSION_SECURE", "false").lower() == "true"
+
+    # Account lockout (brute-force login protection)
+    MAX_FAILED_LOGIN_ATTEMPTS = int(os.environ.get("JOINTX_MAX_LOGIN_ATTEMPTS", "5"))
+    LOCKOUT_MINUTES = int(os.environ.get("JOINTX_LOCKOUT_MINUTES", "15"))
 
     # Demo / prototype mode
     DEMO_MODE = os.environ.get("JOINTX_DEMO_MODE", "true").lower() == "true"

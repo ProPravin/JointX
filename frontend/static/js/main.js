@@ -19,17 +19,24 @@ window.JointX = (function () {
     return data;
   }
 
+  let _lastSyncStatus = null;
+
+  function renderSyncIndicator() {
+    const label = document.getElementById('connLabel');
+    const pill = document.getElementById('conn-pill');
+    if (!label || !_lastSyncStatus) return;
+    const t = window.JointXI18n ? window.JointXI18n.t : (k) => k;
+    label.textContent = t(_lastSyncStatus.online ? 'conn.online' : 'conn.offline');
+    if (pill) pill.classList.toggle('off', !_lastSyncStatus.online);
+  }
+
   async function refreshSyncIndicator() {
-    const el = document.getElementById('sync-indicator');
-    if (!el) return;
+    if (!document.getElementById('connLabel')) return;
     try {
       const res = await api('/api/sync/status', 'GET');
       if (res.success) {
-        const d = res.data;
-        el.textContent = d.online
-          ? `Online — ${d.pending_count} pending`
-          : `Offline — ${d.pending_count} pending`;
-        el.className = 'pill ' + (d.online ? '' : 'pill-muted');
+        _lastSyncStatus = res.data;
+        renderSyncIndicator();
       }
     } catch (e) {
       // Silently ignore — offline-first, sync indicator is a nicety only.
@@ -47,5 +54,5 @@ window.JointX = (function () {
     refreshSyncIndicator();
   });
 
-  return { api, refreshSyncIndicator };
+  return { api, refreshSyncIndicator, renderSyncIndicator };
 })();

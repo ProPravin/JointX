@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from backend.services import imu_service
-from backend.utils.security import login_required
+from backend.utils.security import login_required, require_role
 from backend.utils.validators import require_fields
 from backend.utils.helpers import api_success
 
@@ -10,6 +10,7 @@ imu_bp = Blueprint("imu", __name__, url_prefix="/api/imu")
 
 @imu_bp.route("/calibrate", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def calibrate():
     result = imu_service.calibrate_imu()
     return jsonify(api_success(result, "IMU calibration complete"))
@@ -17,6 +18,7 @@ def calibrate():
 
 @imu_bp.route("/start", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def start():
     result = imu_service.start_imu()
     return jsonify(api_success(result, "IMU capture started"))
@@ -24,6 +26,7 @@ def start():
 
 @imu_bp.route("/stop", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def stop():
     result = imu_service.stop_imu()
     return jsonify(api_success(result, "IMU capture stopped"))
@@ -31,6 +34,7 @@ def stop():
 
 @imu_bp.route("/analyze", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def analyze():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])

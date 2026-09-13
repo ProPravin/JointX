@@ -9,6 +9,7 @@
     </button>
     <a class="btn btn-secondary" id="download-link" href="#" download="jointx_report.txt" data-i18n="report.download_txt">Download .txt</a>
     <button class="btn btn-secondary" id="download-pdf-btn" data-i18n="report.download_pdf">Download PDF</button>
+    <button class="btn" id="send-report-btn">📲 Send Report</button>
     <button id="finalize-btn" class="btn btn-primary" data-i18n="report.finalize">Finalize &amp; Queue for Sync</button>
   </div>
 </div>
@@ -16,6 +17,24 @@
   <pre id="report-text" class="report-pre" data-i18n="report.loading">Loading report...</pre>
 </div>
 <p id="finalize-msg" class="hint"></p>
+
+<div class="modal-overlay hidden" id="send-report-modal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>Send Report</span>
+      <button class="modal-close" id="send-report-close" aria-label="Close">✕</button>
+    </div>
+    <p class="hint">Send this OA screening report summary to the patient's mobile number.</p>
+    <label for="send-report-phone">Patient Mobile Number</label>
+    <input id="send-report-phone" type="tel" inputmode="tel" placeholder="+91 98765 43210">
+    <div class="banner banner-info" style="margin-top:12px">Send opens WhatsApp/SMS directly on this device with the screening summary pre-filled, including the screening disclaimer. Sending itself happens from your own WhatsApp/SMS app — JointX does not transmit messages on your behalf.</div>
+    <div class="button-row" style="flex-direction:column">
+      <button class="btn btn-primary btn-block" id="send-report-whatsapp">Send via WhatsApp</button>
+      <button class="btn btn-block" id="send-report-sms">Send via SMS</button>
+    </div>
+    <p id="send-report-error" class="error-text"></p>
+  </div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -24,10 +43,12 @@ const screeningId = {{ screening_id }};
 document.getElementById('download-link').href = '/api/reports/' + screeningId + '/text';
 
 let _reportData = null;
+let _reportFullText = '';
 
 async function loadReport() {
   const textRes = await fetch('/api/reports/' + screeningId + '/text');
-  document.getElementById('report-text').textContent = await textRes.text();
+  _reportFullText = await textRes.text();
+  document.getElementById('report-text').textContent = _reportFullText;
 
   const jsonRes = await JointX.api('/api/reports/' + screeningId, 'GET');
   if (jsonRes.success) _reportData = jsonRes.data;
@@ -112,6 +133,10 @@ function buildReportPdf(r) {
   kvRow('Left-right asymmetry', gait.left_right_asymmetry != null ? gait.left_right_asymmetry + '%' : null);
   kvRow('Knee angle ROM', gait.knee_angle_rom != null ? gait.knee_angle_rom + '°' : null);
   kvRow('Stride time', gait.stride_time != null ? gait.stride_time + 's' : null);
+  if (gait.left_knee_rom != null && gait.right_knee_rom != null) {
+    kvRow('Left knee ROM', gait.left_knee_rom + '°');
+    kvRow('Right knee ROM', gait.right_knee_rom + '°');
+  }
 
   sectionHeading('IMU Features' + (imu.is_demo ? ' (DEMO DATA)' : ''));
   kvRow('Data quality OK', imu.data_quality_ok);
@@ -163,5 +188,50 @@ document.getElementById('download-pdf-btn').addEventListener('click', async () =
   const code = (_reportData.patient && _reportData.patient.patient_code) || screeningId;
   doc.save(`JointX_Report_${code}.pdf`);
 });
+
+/* ---------------- Send Report via WhatsApp / SMS ----------------
+   Sends the complete derived report (the same text as the "Download .txt"
+   record — every section: patient, questionnaire, gait, IMU, functional
+   tests, AI risk result, key contributing features, referral status, and
+   all disclaimers) rather than a short summary, per spec. */
+async function ensureReportData() {
+  if (_reportData && _reportFullText) return _reportData;
+  await loadReport();
+  return _reportData;
+}
+
+document.getElementById('send-report-btn').addEventListener('click', async () => {
+  const data = await ensureReportData();
+  const phoneInput = document.getElementById('send-report-phone');
+  // Always re-sync from the patient's own record — never a stale/typed value.
+  phoneInput.value = (data && data.patient && data.patient.contact_phone) || '';
+  document.getElementById('send-report-error').textContent = '';
+  document.getElementById('send-report-modal').classList.remove('hidden');
+});
+document.getElementById('send-report-close').addEventListener('click', () => {
+  document.getElementById('send-report-modal').classList.add('hidden');
+});
+document.getElementById('send-report-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'send-report-modal') document.getElementById('send-report-modal').classList.add('hidden');
+});
+
+async function sendReportVia(channel) {
+  const raw = (document.getElementById('send-report-phone').value || '').trim();
+  const digits = raw.replace(/[^\d+]/g, '');
+  if (digits.replace(/\D/g, '').length < 8) {
+    document.getElementById('send-report-error').textContent = 'Please enter a valid mobile number with country code.';
+    return;
+  }
+  await ensureReportData();
+  const message = _reportFullText || 'JointX screening report could not be loaded.';
+  if (channel === 'whatsapp') {
+    window.open(`https://wa.me/${digits.replace(/[^\d]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+  } else {
+    window.open(`sms:${digits}?body=${encodeURIComponent(message)}`, '_blank');
+  }
+  document.getElementById('send-report-modal').classList.add('hidden');
+}
+document.getElementById('send-report-whatsapp').addEventListener('click', () => sendReportVia('whatsapp'));
+document.getElementById('send-report-sms').addEventListener('click', () => sendReportVia('sms'));
 </script>
 {% endblock %}

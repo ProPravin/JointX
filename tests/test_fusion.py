@@ -1,3 +1,5 @@
+import math
+
 from fusion.fusion import build_unified_features
 from fusion.feature_schema import FEATURE_NAMES, ordered_vector
 
@@ -22,8 +24,25 @@ def test_build_unified_features_order_matches_schema():
     assert fused["features"]["age"] == 60
 
 
-def test_ordered_vector_defaults_missing_to_zero():
+def test_ordered_vector_defaults_missing_to_nan():
+    """
+    A missing sensor/patient/functional reading must become NaN, not 0.0
+    (spec: Data Integrity #A2) -- 0.0 would be indistinguishable from a
+    legitimate zero reading and would tell the model "severe absence of
+    movement" instead of "this was never captured".
+    """
     vector = ordered_vector({"age": 40})
     assert len(vector) == len(FEATURE_NAMES)
     assert vector[FEATURE_NAMES.index("age")] == 40.0
+    assert math.isnan(vector[FEATURE_NAMES.index("pain_score")])
+
+    # Meta features (presence indicators, quality scores) are always
+    # computable and default to 0.0, never NaN, when absent from the dict.
+    assert vector[FEATURE_NAMES.index("imu_present")] == 0.0
+    assert vector[FEATURE_NAMES.index("gait_quality")] == 0.0
+
+
+def test_ordered_vector_preserves_legitimate_zero():
+    """A real zero reading must stay 0.0, never be confused with missing/NaN."""
+    vector = ordered_vector({"pain_score": 0})
     assert vector[FEATURE_NAMES.index("pain_score")] == 0.0

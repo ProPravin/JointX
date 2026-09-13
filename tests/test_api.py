@@ -40,9 +40,15 @@ def test_full_screening_workflow(app, logged_in_client):
     res = c.get(f"/api/shap/{screening_id}")
     assert res.status_code == 200
 
-    # Review
+    # Review -- blinded workflow: blind assessment, then reveal, then finalize
+    res = c.post("/api/review/blind", json={"screening_id": screening_id, "reviewer_label_blind": "LOW"})
+    assert res.status_code == 201
+
+    res = c.post(f"/api/review/{screening_id}/reveal", json={})
+    assert res.status_code == 200
+
     res = c.post("/api/review", json={"screening_id": screening_id, "notes": "Looks fine",
-                                        "agrees_with_model": 1})
+                                        "agrees_with_model": 1, "label_source": "model_confirmed"})
     assert res.status_code == 201
 
     # Referral

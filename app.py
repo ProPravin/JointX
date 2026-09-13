@@ -17,6 +17,7 @@ from backend.utils.error_handler import register_error_handlers
 from backend.utils.logger import get_logger
 
 from backend.routes.auth_routes import auth_bp
+from backend.routes.admin_routes import admin_bp
 from backend.routes.patient_routes import patient_bp
 from backend.routes.screening_routes import screening_bp
 from backend.routes.questionnaire_routes import questionnaire_bp
@@ -44,10 +45,14 @@ def create_app():
     )
     app.config["SECRET_KEY"] = Config.SECRET_KEY
     app.permanent_session_lifetime = timedelta(minutes=Config.SESSION_LIFETIME_MINUTES)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SECURE"] = Config.SESSION_COOKIE_SECURE
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
     # --- API blueprints ---
     for bp in (
         auth_bp,
+        admin_bp,
         patient_bp,
         screening_bp,
         questionnaire_bp,
@@ -80,13 +85,32 @@ def create_app():
     #     drives the actual API calls documented above) ---
     @app.route("/")
     def index():
-        if session.get("worker_id"):
-            return redirect(url_for("dashboard"))
+        # Always land on the login page — visiting the site never skips
+        # straight into the dashboard just because a session cookie happens
+        # to still be valid. The session itself is untouched (other pages
+        # you navigate to directly still work while logged in); this only
+        # changes what "/" itself shows.
         return redirect(url_for("login_page"))
 
     @app.route("/login")
     def login_page():
         return render_template("login.html", demo_mode=Config.DEMO_MODE)
+
+    @app.route("/register")
+    def register_page():
+        # Self-registration is a demo-mode convenience only; in production
+        # accounts are created by an Admin from /admin/users (see
+        # backend/routes/admin_routes.py) or via `flask create-admin` for
+        # the very first Admin account.
+        if not Config.DEMO_MODE:
+            return redirect(url_for("login_page"))
+        return render_template("register.html")
+
+    @app.route("/admin/users")
+    def admin_users_page():
+        if tier_for_role(session.get("worker_role")) != "admin":
+            return redirect(url_for("login_page"))
+        return render_template("admin_users.html")
 
     @app.route("/dashboard")
     def dashboard():
@@ -145,6 +169,10 @@ def create_app():
     def referrals_page():
         return render_template("referrals.html")
 
+    @app.route("/guidance")
+    def guidance_page():
+        return render_template("guidance.html")
+
     @app.route("/reports/<int:screening_id>")
     def reports_page(screening_id):
         return render_template("reports.html", screening_id=screening_id)
@@ -152,6 +180,42 @@ def create_app():
     @app.route("/device-status")
     def device_status_page():
         return render_template("device_status.html")
+
+    @app.cli.command("create-admin")
+    def create_admin_command():
+        """
+        Create the first Administrator account for a production deployment
+        (JOINTX_DEMO_MODE=false), where /register is disabled and no
+        accounts are seeded automatically. Run once:
+            flask create-admin
+        Every other account (worker or reviewer) is then created by that
+        Admin from the /admin/users page.
+        """
+        import getpass
+        from backend.services import admin_service
+        from backend.utils.validators import ValidationError
+
+        username = input("Admin username: ").strip()
+        full_name = input("Admin full name: ").strip()
+        facility_name = input("Facility name (optional): ").strip() or None
+        password = getpass.getpass("Admin password: ")
+        confirm = getpass.getpass("Confirm password: ")
+        if password != confirm:
+            print("Passwords do not match.")
+            return
+        try:
+            with app.app_context():
+                worker = admin_service.create_worker(
+                    username=username,
+                    password=password,
+                    full_name=full_name,
+                    role="ADMIN",
+                    facility_name=facility_name,
+                    created_by=None,
+                )
+            print(f"Admin account '{worker['username']}' created (id={worker['id']}).")
+        except ValidationError as exc:
+            print(f"Could not create admin: {exc.message}")
 
     with app.app_context():
         init_db()

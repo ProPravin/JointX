@@ -33,3 +33,10 @@ SHAP_TOP_N_FEATURES = 6
 MIN_POSE_LANDMARK_VISIBILITY = 0.5   # mean MediaPipe visibility score
 MIN_POSE_FRAMES = 30                 # minimum usable frames in a gait test
 MIN_IMU_SAMPLES = 50                 # minimum samples per IMU sensor
+
+# REFUSAL GATE (spec: Data Integrity #A2): the pipeline does not predict at
+# all -- rather than silently degrading -- when there isn't enough captured
+# data to trust a prediction. A screening below this bar is recorded with
+# refused=1 and a human-readable refusal_reason, never silently discarded.
+MIN_FEATURE_BLOCKS_PRESENT = 2       # of {imu, gait, functional, questionnaire}
+MIN_OVERALL_CAPTURE_QUALITY = 0.4    # mean quality across the blocks that ARE present

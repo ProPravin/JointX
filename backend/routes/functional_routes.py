@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from backend.services import functional_service
-from backend.utils.security import login_required
+from backend.utils.security import login_required, require_role
 from backend.utils.validators import require_fields
 from backend.utils.helpers import api_success
 
@@ -10,6 +10,7 @@ functional_bp = Blueprint("functional", __name__, url_prefix="/api/functional")
 
 @functional_bp.route("/sit-to-stand", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def sit_to_stand():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])
@@ -19,6 +20,7 @@ def sit_to_stand():
 
 @functional_bp.route("/squat", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def squat():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])
@@ -28,6 +30,7 @@ def squat():
 
 @functional_bp.route("/balance", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def balance():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])
@@ -37,6 +40,7 @@ def balance():
 
 @functional_bp.route("/turn", methods=["POST"])
 @login_required
+@require_role("worker", "admin")
 def turn():
     data = request.get_json(force=True, silent=True) or {}
     require_fields(data, ["screening_id"])

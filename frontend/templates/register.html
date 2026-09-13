@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Register — JointX{% endblock %}
+{% set show_nav = false %}
+{% block content %}
+<div class="centered-page">
+  <div class="card login-card">
+    <div class="brand brand-centered">
+      <h1>Joint<b style="color:var(--color-primary)">X</b></h1>
+    </div>
+    <p class="subtitle" data-i18n="register.title">Register Account</p>
+
+    <form id="register-form">
+      <label data-i18n="register.full_name">Full Name</label>
+      <input type="text" id="full_name" required>
+
+      <label data-i18n="register.username">Choose a Username</label>
+      <input type="text" id="username" autocomplete="username" required>
+
+      <label data-i18n="register.password">Choose a Password</label>
+      <input type="password" id="password" autocomplete="new-password" minlength="6" required>
+
+      <label data-i18n="login.role">Role</label>
+      <select id="register-role" required>
+        <option value="Healthcare Worker" selected data-i18n="role.worker">Healthcare Worker</option>
+        <option value="Doctor / Reviewer" data-i18n="role.reviewer">Doctor / Reviewer</option>
+        <option value="Administrator" data-i18n="role.admin">Administrator</option>
+      </select>
+
+      <label data-i18n="register.facility">Facility Name (optional)</label>
+      <input type="text" id="facility_name">
+
+      <button type="submit" class="btn btn-primary btn-block" data-i18n="register.submit">Register</button>
+      <p id="register-error" class="error-text"></p>
+    </form>
+
+    <p class="hint" style="text-align:center;margin-top:12px">
+      <span data-i18n="register.have_account">Already have an account?</span>
+      <a href="/login" data-i18n="register.login_link">Log in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    full_name: document.getElementById('full_name').value,
+    username: document.getElementById('username').value,
+    password: document.getElementById('password').value,
+    role: document.getElementById('register-role').value,
+    facility_name: document.getElementById('facility_name').value || null,
+  };
+  const errEl = document.getElementById('register-error');
+  errEl.textContent = '';
+  const res = await JointX.api('/api/auth/register', 'POST', payload);
+  if (res.success) {
+    const landing = { worker: '/patients/new', reviewer: '/patients', admin: '/dashboard' };
+    window.location.href = landing[res.data.role_tier] || '/dashboard';
+  } else {
+    errEl.textContent = res.error || 'Registration failed';
+  }
+});
+</script>
+{% endblock %}

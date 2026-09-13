@@ -1,12 +1,22 @@
 """Runs multimodal feature fusion for a screening and persists the result."""
 from database.database import get_cursor
 from backend.utils.helpers import to_json
-from backend.utils.error_handler import JointXError, DataQualityError
+from backend.utils.error_handler import JointXError
 from fusion.fusion import build_unified_features
 from fusion.feature_schema import SCHEMA_VERSION
 
 
 def fuse_screening_features(screening_id: int) -> dict:
+    """
+    Fuses whatever blocks a screening actually has into a feature vector.
+    This deliberately does NOT require every block to be present or
+    high-quality (spec: Data Integrity #A2) -- a screening with, say, only
+    IMU + questionnaire data still fuses, with the missing gait/functional
+    features recorded as NaN and gait_present/functional_present as 0.
+    Whether that is enough to actually PREDICT on is decided later, by the
+    refusal gate in backend/services/prediction_service.py -- fusion's job is
+    only to build an honest record of what was and wasn't captured.
+    """
     with get_cursor() as cur:
         cur.execute("SELECT * FROM screenings WHERE id = ?", (screening_id,))
         screening = cur.fetchone()
@@ -31,13 +41,6 @@ def fuse_screening_features(screening_id: int) -> dict:
         cur.execute("SELECT * FROM functional_features WHERE screening_id = ?", (screening_id,))
         row = cur.fetchone()
         functional = dict(row) if row else None
-
-    if not questionnaire:
-        raise JointXError("Questionnaire not completed for this screening", status_code=422)
-    if not gait or not gait.get("data_quality_ok"):
-        raise DataQualityError("Gait data missing or of insufficient quality; repeat the gait test.")
-    if not imu or not imu.get("data_quality_ok"):
-        raise DataQualityError("IMU data missing or of insufficient quality; repeat the IMU test.")
 
     fused = build_unified_features(gait, imu, questionnaire, patient, functional)
 

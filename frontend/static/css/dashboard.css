@@ -42,3 +42,18 @@
 
 .filter-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
 .filter-row select { width: auto; margin-top: 0; }
+
+/* compact variant used on Device Status and other dense-data pages */
+.stat-grid.compact { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.65rem; }
+.stat-grid.compact .stat-card { padding: 0.65rem 0.75rem; text-align: left; }
+.stat-grid.compact .stat-value { font-size: 1.05rem; }
+.stat-grid.compact .stat-label { font-size: 0.72rem; margin-top: 0.1rem; }
+
+.collapsible summary {
+  cursor: pointer; font-weight: 700; list-style: none; display: flex;
+  align-items: center; gap: 0.4rem; font-size: 0.95rem;
+}
+.collapsible summary::-webkit-details-marker { display: none; }
+.collapsible summary::before { content: '▸'; color: var(--color-muted); transition: transform 0.15s ease; }
+.collapsible[open] summary::before { transform: rotate(90deg); }
+.collapsible .collapsible-body { margin-top: 0.75rem; }

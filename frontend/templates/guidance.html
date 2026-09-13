@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Joint Care Guidance — JointX{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Joint Care Guidance</h1>
+</div>
+<div class="card">
+  <div class="guide-head">
+    <h3>Recommended</h3>
+    <button type="button" class="tts-btn" data-tts-target="guidance-all-text" title="Listen" aria-label="Listen">
+      <span class="tts-icon">🔊</span><span>Listen to all</span>
+    </button>
+  </div>
+  <div id="guidance-all-text" class="hidden">
+    Low-impact physical activity. Walking, swimming or cycling to keep joints mobile without added strain.
+    Joint mobility exercises. Gentle daily stretches to maintain range of motion.
+    Healthy weight management. Reducing body weight lowers load transmitted through the knee joint.
+    Balanced nutrition. Anti-inflammatory foods can support joint health over time.
+    Avoid prolonged joint loading. Limit long periods of squatting, kneeling or standing still.
+  </div>
+  <div class="guide-grid">
+    <div class="guide-item">
+      <div class="ic">🚶</div>
+      <div>
+        <div class="t">Low-impact physical activity</div>
+        <div class="d">Walking, swimming or cycling to keep joints mobile without added strain.</div>
+      </div>
+      <button type="button" class="tts-btn" data-tts-text="Low-impact physical activity. Walking, swimming or cycling to keep joints mobile without added strain." title="Listen" aria-label="Listen">🔊</button>
+    </div>
+    <div class="guide-item">
+      <div class="ic">🦵</div>
+      <div>
+        <div class="t">Joint mobility exercises</div>
+        <div class="d">Gentle daily stretches to maintain range of motion.</div>
+      </div>
+      <button type="button" class="tts-btn" data-tts-text="Joint mobility exercises. Gentle daily stretches to maintain range of motion." title="Listen" aria-label="Listen">🔊</button>
+    </div>
+    <div class="guide-item">
+      <div class="ic">⚖️</div>
+      <div>
+        <div class="t">Healthy weight management</div>
+        <div class="d">Reducing body weight lowers load transmitted through the knee joint.</div>
+      </div>
+      <button type="button" class="tts-btn" data-tts-text="Healthy weight management. Reducing body weight lowers load transmitted through the knee joint." title="Listen" aria-label="Listen">🔊</button>
+    </div>
+    <div class="guide-item">
+      <div class="ic">🥗</div>
+      <div>
+        <div class="t">Balanced nutrition</div>
+        <div class="d">Anti-inflammatory foods can support joint health over time.</div>
+      </div>
+      <button type="button" class="tts-btn" data-tts-text="Balanced nutrition. Anti-inflammatory foods can support joint health over time." title="Listen" aria-label="Listen">🔊</button>
+    </div>
+    <div class="guide-item">
+      <div class="ic">🪑</div>
+      <div>
+        <div class="t">Avoid prolonged joint loading</div>
+        <div class="d">Limit long periods of squatting, kneeling or standing still.</div>
+      </div>
+      <button type="button" class="tts-btn" data-tts-text="Avoid prolonged joint loading. Limit long periods of squatting, kneeling or standing still." title="Listen" aria-label="Listen">🔊</button>
+    </div>
+  </div>
+  <div class="notice" style="margin-top:16px;padding:12px;background:#fff8e5;border:1px solid #f0dda5;border-radius:9px;color:#765f17;font-size:12px">
+    This guidance is general preventive information and does not replace professional medical advice.
+  </div>
+</div>
+{% endblock %}

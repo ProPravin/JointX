@@ -24,8 +24,11 @@ def predict():
     require_fields(data, ["screening_id"])
     screening_id = int(data["screening_id"])
     result = prediction_service.run_prediction(screening_id)
+    if result.get("refused"):
+        return jsonify(api_success(result, "Insufficient capture quality — screening not scored"))
     # SHAP explanation is generated immediately alongside the prediction so
-    # the results screen always has both available together.
+    # the results screen always has both available together. Skipped on
+    # refusal since there is no prediction to explain.
     shap_service.run_shap_explanation(screening_id)
     return jsonify(api_success(result, "Prediction complete"))
 

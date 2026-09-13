@@ -12,6 +12,7 @@
   <div class="stat-card"><span class="stat-value" id="stat-pending-referrals">—</span><span class="stat-label" data-i18n="dash.stat_pending_referrals">Pending Referrals</span></div>
   <div class="stat-card"><span class="stat-value" id="stat-followup">—</span><span class="stat-label" data-i18n="dash.stat_followup">Follow-up Cases</span></div>
   <div class="stat-card"><span class="stat-value" id="stat-unsynced">—</span><span class="stat-label" data-i18n="dash.stat_unsynced">Unsynced Records</span></div>
+  <div class="stat-card"><span class="stat-value" id="stat-refused">—</span><span class="stat-label" data-i18n="dash.stat_refused">Refused (Insufficient Quality)</span></div>
 </div>
 
 <div class="grid-2">
@@ -39,6 +40,7 @@ async function loadDashboard() {
   document.getElementById('stat-pending-referrals').textContent = d.pending_referrals;
   document.getElementById('stat-followup').textContent = d.follow_up_cases;
   document.getElementById('stat-unsynced').textContent = d.unsynced_records;
+  document.getElementById('stat-refused').textContent = d.refused_screenings;
 
   const dist = document.getElementById('risk-distribution');
   dist.innerHTML = '';

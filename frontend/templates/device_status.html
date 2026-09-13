@@ -5,18 +5,20 @@
   <h1>Device Status</h1>
   <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
 </div>
-<div class="stat-grid" id="device-grid">
+<div class="stat-grid compact" id="device-grid">
   <div class="stat-card"><span class="stat-value" id="dev-camera">—</span><span class="stat-label">Camera</span></div>
   <div class="stat-card"><span class="stat-value" id="dev-imu-left">—</span><span class="stat-label">IMU Left</span></div>
   <div class="stat-card"><span class="stat-value" id="dev-imu-right">—</span><span class="stat-label">IMU Right</span></div>
   <div class="stat-card"><span class="stat-value" id="dev-mode">—</span><span class="stat-label">Demo Mode</span></div>
   <div class="stat-card"><span class="stat-value" id="dev-unsynced">—</span><span class="stat-label">Unsynced Records</span></div>
 </div>
-<div class="card">
-  <h2>Manual Sync</h2>
-  <button id="sync-btn" class="btn btn-primary">Attempt Sync Now</button>
-  <p id="sync-result" class="hint"></p>
-</div>
+<details class="card collapsible section-gap" open>
+  <summary>Manual Sync</summary>
+  <div class="collapsible-body">
+    <button id="sync-btn" class="btn btn-primary">Attempt Sync Now</button>
+    <p id="sync-result" class="hint"></p>
+  </div>
+</details>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -37,6 +39,7 @@ document.getElementById('sync-btn').addEventListener('click', async () => {
     ? `Attempted: ${res.data.attempted}, Synced: ${res.data.synced}, Failed: ${res.data.failed}${res.data.reason ? ' (' + res.data.reason + ')' : ''}`
     : res.error;
   loadStatus();
+  if (window.JointX && window.JointX.refreshSyncIndicator) window.JointX.refreshSyncIndicator();
 });
 loadStatus();
 </script>

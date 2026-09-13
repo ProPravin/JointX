@@ -15,7 +15,7 @@ gait analysis (MediaPipe), patient-reported screening fields, and four short
 functional tasks (sit-to-stand, squat, balance, turn).
 """
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "3.0"
 
 # Ordered list of (feature_name, source) — source is informational only.
 FEATURE_SCHEMA = [
@@ -48,22 +48,58 @@ FEATURE_SCHEMA = [
     ("squat_rom", "functional"),
     ("balance_stability", "functional"),
     ("turn_duration", "functional"),
+    # Missingness indicators (spec: Data Integrity #A2) — always 0/1, never
+    # NaN themselves, computed at fusion time from whether each block's row
+    # existed in the DB. These let the model learn "this pattern is a missing
+    # IMU block", not just see the block's raw features arrive as NaN with no
+    # explicit signal of why.
+    ("imu_present", "meta"),
+    ("gait_present", "meta"),
+    ("functional_present", "meta"),
+    ("questionnaire_complete", "meta"),
+    # Per-block capture quality, 0-1 (spec: Data Integrity #A2) — 0.0 when the
+    # block is entirely absent, otherwise derived from real stored signals
+    # (frame/sample counts, MediaPipe visibility, per-task quality flags).
+    # See fusion/fusion.py for the exact computation and its documented
+    # limitations (e.g. IMU saturation is not yet detected).
+    ("imu_quality", "meta"),
+    ("gait_quality", "meta"),
+    ("functional_quality", "meta"),
 ]
 
 FEATURE_NAMES = [name for name, _source in FEATURE_SCHEMA]
 
-# Sensible fallback values used only when a given input is genuinely missing
-# after a best-effort extraction (never used to fabricate a "good" reading;
-# the pipeline still refuses to predict if quality checks failed upstream).
-FEATURE_DEFAULTS = {name: 0.0 for name in FEATURE_NAMES}
+# Meta features (presence indicators, quality scores) are always computable
+# at fusion time and are never genuinely missing, unlike sensor-derived
+# features -- so they alone default to 0.0 rather than NaN.
+_META_FEATURES = {"imu_present", "gait_present", "functional_present", "questionnaire_complete",
+                   "imu_quality", "gait_quality", "functional_quality"}
+
+# A missing sensor/patient/functional feature is enters the model as NaN, NOT
+# 0.0 (spec: Data Integrity #A2). Coercing a missing reading to 0.0 -- e.g. a
+# cadence that could not be measured because the camera failed -- makes the
+# model read "0 steps per minute", which looks like severe immobility, not
+# like a hardware failure. In a rural PHC, hardware/capture failure is the
+# common case, so this distinction matters far more than it would in a lab.
+# XGBoost handles NaN as "missing" natively and learns a per-split default
+# direction for it, so no imputation is performed anywhere in this pipeline.
+FEATURE_DEFAULTS = {name: (0.0 if name in _META_FEATURES else float("nan")) for name in FEATURE_NAMES}
 
 
 def ordered_vector(feature_dict: dict) -> list:
-    """Builds a list of floats in FEATURE_SCHEMA order from a feature dict."""
-    return [
-        float(feature_dict.get(name, FEATURE_DEFAULTS[name]) or 0.0)
-        for name in FEATURE_NAMES
-    ]
+    """
+    Builds a list of floats in FEATURE_SCHEMA order from a feature dict.
+    Deliberately does NOT coerce a missing/None value to 0.0 (see the
+    FEATURE_DEFAULTS comment above) -- a value that is genuinely absent stays
+    NaN, a legitimate zero reading stays 0.0. The two must never be conflated.
+    """
+    vector = []
+    for name in FEATURE_NAMES:
+        value = feature_dict.get(name)
+        if value is None:
+            value = FEATURE_DEFAULTS[name]
+        vector.append(float(value))
+    return vector
 
 
 def validate_schema(feature_dict: dict):

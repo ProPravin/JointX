@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}User Management — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1>User Management</h1></div>
+
+<div class="card">
+  <h2>Create Account</h2>
+  <form id="create-worker-form" class="form-grid">
+    <label>Username <input type="text" id="nw-username" required></label>
+    <label>Full name <input type="text" id="nw-full-name" required></label>
+    <label>Role
+      <select id="nw-role" required>
+        <option value="ASHA">Healthcare Worker (ASHA)</option>
+        <option value="ANM">Healthcare Worker (ANM)</option>
+        <option value="CHO">Healthcare Worker (CHO)</option>
+        <option value="PHC_STAFF">Healthcare Worker (PHC Staff)</option>
+        <option value="DOCTOR">Doctor / Reviewer</option>
+        <option value="ADMIN">Administrator</option>
+      </select>
+    </label>
+    <label>Facility name <input type="text" id="nw-facility"></label>
+    <label>Temporary password <input type="password" id="nw-password" required minlength="8"></label>
+    <button type="submit" class="btn-primary">Create Account</button>
+  </form>
+  <p id="create-worker-msg"></p>
+</div>
+
+<div class="card">
+  <h2>Accounts</h2>
+  <table class="data-table">
+    <thead><tr><th>Username</th><th>Full name</th><th>Role</th><th>Facility</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody id="workers-tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function loadWorkers() {
+  const res = await JointX.api('/api/admin/workers', 'GET');
+  const tbody = document.getElementById('workers-tbody');
+  tbody.innerHTML = '';
+  if (!res.success) return;
+  res.data.forEach(w => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${w.username}</td>
+      <td>${w.full_name}</td>
+      <td>${w.role_label}</td>
+      <td>${w.facility_name || ''}</td>
+      <td>${w.is_active ? 'Active' : 'Disabled'}</td>
+      <td>
+        <button data-id="${w.id}" data-active="${w.is_active ? 0 : 1}" class="toggle-active-btn">${w.is_active ? 'Disable' : 'Enable'}</button>
+        <button data-id="${w.id}" class="reset-pw-btn">Reset Password</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  document.querySelectorAll('.toggle-active-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.dataset.id;
+      const isActive = e.target.dataset.active === '1';
+      await JointX.api(`/api/admin/workers/${id}/active`, 'PUT', {is_active: isActive});
+      loadWorkers();
+    });
+  });
+  document.querySelectorAll('.reset-pw-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const newPassword = prompt('New password (min 8 characters, letters and digits):');
+      if (!newPassword) return;
+      const res = await JointX.api(`/api/admin/workers/${e.target.dataset.id}/reset-password`, 'POST', {new_password: newPassword});
+      if (!res.success) alert(res.error || 'Could not reset password');
+    });
+  });
+}
+
+document.getElementById('create-worker-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('create-worker-msg');
+  const res = await JointX.api('/api/admin/workers', 'POST', {
+    username: document.getElementById('nw-username').value,
+    full_name: document.getElementById('nw-full-name').value,
+    role: document.getElementById('nw-role').value,
+    facility_name: document.getElementById('nw-facility').value || null,
+    password: document.getElementById('nw-password').value,
+  });
+  msg.textContent = res.success ? 'Account created.' : (res.error || 'Could not create account');
+  if (res.success) {
+    e.target.reset();
+    loadWorkers();
+  }
+});
+
+loadWorkers();
+</script>
+{% endblock %}

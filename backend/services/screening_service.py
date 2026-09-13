@@ -1,7 +1,7 @@
 """Screening session lifecycle: create, fetch, update status, complete."""
 from database.database import get_cursor
 from backend.utils.error_handler import JointXError
-from backend.utils.helpers import from_json
+from backend.utils.helpers import from_json, compute_bmi
 
 
 def start_screening(patient_id: int, performed_by: int, is_demo: bool = False) -> dict:
@@ -50,6 +50,8 @@ def get_full_screening_record(screening_id: int) -> dict:
     with get_cursor() as cur:
         cur.execute("SELECT * FROM patients WHERE id = ?", (screening["patient_id"],))
         patient = dict(cur.fetchone() or {})
+        if patient:
+            patient["bmi"] = compute_bmi(patient.get("height_cm"), patient.get("weight_kg"))
 
         cur.execute("SELECT * FROM questionnaire WHERE screening_id = ?", (screening_id,))
         row = cur.fetchone()

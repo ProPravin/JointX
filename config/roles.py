@@ -26,3 +26,19 @@ def tier_for_role(role: str) -> str:
 
 def label_for_role(role: str) -> str:
     return TIER_LABELS.get(tier_for_role(role), "Healthcare Worker")
+
+
+# The three portal-facing role choices shown in login/registration dropdowns,
+# mapped to the specific underlying healthcare_workers.role value a new
+# account gets when that choice is picked at registration.
+DISPLAY_ROLES = {
+    "Healthcare Worker": "ASHA",
+    "Doctor / Reviewer": "DOCTOR",
+    "Administrator": "ADMIN",
+}
+
+
+def tier_for_display_role(display_role: str) -> str:
+    """Tier implied by a login/registration dropdown choice, or "" if unrecognized."""
+    db_role = DISPLAY_ROLES.get(display_role)
+    return tier_for_role(db_role) if db_role else ""

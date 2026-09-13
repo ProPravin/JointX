@@ -18,6 +18,11 @@
     </table>
   </div>
 </div>
+<div class="card section-gap" id="trend-card" style="display:none;margin-top:15px">
+  <h2>Longitudinal OA Risk Trend</h2>
+  <p class="hint">This patient isn't screened once — risk is tracked over time across all completed screenings.</p>
+  <div class="trend-row" id="trend-row"></div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -52,6 +57,27 @@ document.getElementById('new-screening-btn').addEventListener('click', () => {
   window.location.href = '/screening/new/' + patientId;
 });
 
+async function loadRiskTrend() {
+  const res = await JointX.api('/api/patients/' + patientId + '/risk-history', 'GET');
+  if (!res.success || !res.data.length) return;
+  const card = document.getElementById('trend-card');
+  const row = document.getElementById('trend-row');
+  card.style.display = 'block';
+  row.innerHTML = '';
+  res.data.forEach(entry => {
+    const score = entry.risk_score != null ? Math.round(entry.risk_score * 100) : null;
+    const bar = document.createElement('div');
+    const riskClass = (entry.risk_label || '').toLowerCase();
+    bar.className = 'trend-bar' + (riskClass ? ' risk-' + riskClass + '-bar' : '');
+    const height = score != null ? Math.max(6, Math.min(100, score)) : 6;
+    bar.style.height = height + '%';
+    const dateLabel = (entry.started_at || '').slice(0, 10);
+    bar.innerHTML = `<i>${score != null ? score : entry.risk_label}</i><span class="m">${dateLabel}</span>`;
+    row.appendChild(bar);
+  });
+}
+
 loadPatient();
+loadRiskTrend();
 </script>
 {% endblock %}

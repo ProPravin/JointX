@@ -15,7 +15,7 @@ meaningful to explain during development/demos.
 import numpy as np
 
 from config.model_config import RISK_THRESHOLDS, RISK_LABELS
-from fusion.feature_schema import FEATURE_NAMES
+from fusion.feature_schema import FEATURE_NAMES, ordered_vector
 from ml.model_loader import load_model
 from backend.utils.logger import get_logger
 
@@ -128,11 +128,14 @@ def predict_risk(feature_dict: dict) -> dict:
     model, is_prototype, version = load_model()
 
     if model is not None and not is_prototype:
-        vector = np.array([[feature_dict.get(n, 0.0) or 0.0 for n in FEATURE_NAMES]])
+        # Missing features stay NaN here, not 0.0 (spec: Data Integrity #A2)
+        # -- ordered_vector() is the single place this coercion happens, so
+        # training and inference can never silently diverge on it.
+        vector = np.array([ordered_vector(feature_dict)])
         try:
             import xgboost as xgb
 
-            dmatrix = xgb.DMatrix(vector, feature_names=FEATURE_NAMES)
+            dmatrix = xgb.DMatrix(vector, feature_names=FEATURE_NAMES, missing=float("nan"))
             probs = model.predict(dmatrix)[0]  # shape (3,) for LOW/MODERATE/HIGH
             best_idx = int(np.argmax(probs))
             return {

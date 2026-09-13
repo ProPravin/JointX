@@ -96,6 +96,12 @@ def extract_gait_features(landmark_frames, visibilities, fps: float = 15.0, walk
 
     knee_series = left_knee + right_knee
     knee_angle_rom = (max(knee_series) - min(knee_series)) if knee_series else 0.0
+    # Per-side ROM: real, camera-derived values for the Left vs Right display/
+    # report comparison. Kept separate from the ML feature vector (which uses
+    # the pooled knee_angle_rom above) so the trained model's input shape
+    # never changes.
+    left_knee_rom = (max(left_knee) - min(left_knee)) if left_knee else None
+    right_knee_rom = (max(right_knee) - min(right_knee)) if right_knee else None
 
     # Stance/swing ratio: mean(heel-strike -> toe-off) / mean(toe-off -> next heel-strike),
     # per limb, pooled across both limbs. A simplified heuristic for prototype/demo use.
@@ -138,6 +144,8 @@ def extract_gait_features(landmark_frames, visibilities, fps: float = 15.0, walk
             "stride_time": round(stride_time, 3),
             "walking_speed": round(walking_speed, 3) if walking_speed is not None else None,
             "knee_angle_rom": round(knee_angle_rom, 2),
+            "left_knee_rom": round(left_knee_rom, 2) if left_knee_rom is not None else None,
+            "right_knee_rom": round(right_knee_rom, 2) if right_knee_rom is not None else None,
             "stance_swing_ratio": round(stance_swing_ratio, 3),
             "left_right_asymmetry": round(left_right_asymmetry, 2),
             "gait_cycle_variability": round(gait_cycle_variability, 2),
