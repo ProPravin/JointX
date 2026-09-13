@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Processing — JointX{% endblock %}
+{% block content %}
+<div class="centered-page">
+  <div class="card">
+    <h1>Analyzing Screening Data</h1>
+    <ul class="processing-steps" id="processing-steps">
+      <li id="step-fuse">Feature fusion...</li>
+      <li id="step-predict">Risk estimation...</li>
+      <li id="step-done" class="hidden">Done</li>
+    </ul>
+    <p id="processing-error" class="error-text"></p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+
+async function runPipeline() {
+  const fuse = await JointX.api('/api/features/fuse', 'POST', {screening_id: screeningId});
+  if (!fuse.success) {
+    document.getElementById('processing-error').textContent = fuse.error;
+    return;
+  }
+  document.getElementById('step-fuse').classList.add('step-complete');
+
+  const predict = await JointX.api('/api/predict', 'POST', {screening_id: screeningId});
+  if (!predict.success) {
+    document.getElementById('processing-error').textContent = predict.error;
+    return;
+  }
+  document.getElementById('step-predict').classList.add('step-complete');
+  document.getElementById('step-done').classList.remove('hidden');
+
+  window.location.href = '/screening/' + screeningId + '/results';
+}
+runPipeline();
+</script>
+{% endblock %}

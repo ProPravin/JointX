@@ -1,0 +1,26 @@
+# --- Backend / web ---
+Flask==3.0.3
+python-dotenv==1.0.1
+Werkzeug==3.0.3
+requests==2.32.3
+
+# --- Data / ML ---
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.5.1
+xgboost==2.1.1
+shap==0.46.0
+
+# --- Computer vision ---
+opencv-python==4.10.0.84
+mediapipe==0.10.14
+
+# --- Testing ---
+pytest==8.3.2
+
+# NOTE for Raspberry Pi deployment:
+# - Use `opencv-python-headless` instead of `opencv-python` if no GUI/X server
+#   is present.
+# - mediapipe wheels are only published for a subset of architectures/Python
+#   versions; check availability for your Pi's OS/Python combo. If
+#   unavailable, JointX still runs in DEMO_MODE (see .env.example).

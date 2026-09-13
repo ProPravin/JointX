@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Log in — JointX{% endblock %}
+{% set show_nav = false %}
+{% block content %}
+<div class="centered-page">
+  <div class="card login-card">
+    <div class="brand brand-centered">
+      <span class="brand-mark">JX</span>
+      <h1 data-i18n="login.title">JointX</h1>
+    </div>
+    <select id="login-language-select" class="lang-select" data-i18n-lang-select aria-label="Language" style="margin-bottom:12px">
+      {% for code, label in supported_languages.items() %}
+      <option value="{{ code }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <p class="subtitle" data-i18n="login.subtitle">AI-Assisted Early Detection of OA Risk Markers</p>
+    {% if demo_mode %}
+    <div class="banner banner-info" data-i18n="login.demo_banner">DEMO MODE ENABLED — camera/IMU data will be simulated when hardware is unavailable.</div>
+    {% endif %}
+    <form id="login-form">
+      <label data-i18n="login.username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required>
+      <label data-i18n="login.password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="submit" class="btn btn-primary btn-block" data-i18n="login.button">Log in</button>
+      <p class="hint" data-i18n="login.demo_hint">Default demo login: admin / changeme123</p>
+      <p id="login-error" class="error-text"></p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try {
+    const res = await JointX.api('/api/auth/login', 'POST', {username, password});
+    if (res.success) {
+      window.location.href = '/dashboard';
+    } else {
+      errEl.textContent = res.error || 'Login failed';
+    }
+  } catch (err) {
+    errEl.textContent = 'Login failed: ' + err.message;
+  }
+});
+</script>
+{% endblock %}

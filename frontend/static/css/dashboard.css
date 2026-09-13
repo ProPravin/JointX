@@ -1,0 +1,44 @@
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--color-primary-dark);
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.risk-bars { display: flex; flex-direction: column; gap: 0.5rem; }
+.risk-bar-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.4rem 0.6rem; border-radius: 6px; background: #f7faf9;
+}
+.risk-bar-label { font-weight: 700; }
+
+.filter-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.filter-row select { width: auto; margin-top: 0; }

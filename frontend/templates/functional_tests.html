@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Functional Tests — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1 data-i18n="func.title">Functional Screening Tasks</h1></div>
+<div class="progress-steps">
+  <span class="step done" data-i18n="q.step_questionnaire">1. Questionnaire</span>
+  <span class="step done" data-i18n="q.step_gait">2. Gait Test</span>
+  <span class="step done" data-i18n="q.step_imu">3. IMU Test</span>
+  <span class="step active" data-i18n="q.step_functional">4. Functional Tests</span>
+  <span class="step" data-i18n="q.step_results">5. Results</span>
+</div>
+<div class="card">
+  {% if demo_mode %}<div class="banner banner-info">DEMO DATA — NOT CLINICAL DATA. Simulated readings will be used if sensors/camera are not connected.</div>{% endif %}
+  <p data-i18n="func.instructions">Run each short task below. All four can be completed in any order.</p>
+
+  <div class="functional-task">
+    <h3 data-i18n="func.sit_to_stand_title">1. Sit-to-Stand</h3>
+    <p data-i18n="func.sit_to_stand_desc">Ask the patient to stand up from a chair and sit back down (IMU on both limbs).</p>
+    <button id="run-sit-to-stand-btn" class="btn btn-primary" data-i18n="func.run_sit_to_stand">Run Sit-to-Stand Test</button>
+    <p id="sit-to-stand-result" class="result-inline"></p>
+  </div>
+
+  <div class="functional-task">
+    <h3 data-i18n="func.squat_title">2. Squat</h3>
+    <p data-i18n="func.squat_desc">Ask the patient to perform one slow squat in view of the camera.</p>
+    <button id="run-squat-btn" class="btn btn-primary" data-i18n="func.run_squat">Run Squat Test</button>
+    <p id="squat-result" class="result-inline"></p>
+  </div>
+
+  <div class="functional-task">
+    <h3 data-i18n="func.balance_title">3. Balance</h3>
+    <p data-i18n="func.balance_desc">Ask the patient to stand still and hold their balance for a few seconds.</p>
+    <button id="run-balance-btn" class="btn btn-primary" data-i18n="func.run_balance">Run Balance Test</button>
+    <p id="balance-result" class="result-inline"></p>
+  </div>
+
+  <div class="functional-task">
+    <h3 data-i18n="func.turn_title">4. Turn</h3>
+    <p data-i18n="func.turn_desc">Ask the patient to turn around in place.</p>
+    <button id="run-turn-btn" class="btn btn-primary" data-i18n="func.run_turn">Run Turn Test</button>
+    <p id="turn-result" class="result-inline"></p>
+  </div>
+
+  <p id="functional-error" class="error-text"></p>
+  <div class="button-row">
+    <button id="continue-btn" class="btn btn-primary" data-i18n="func.continue_analysis">Continue to Analysis</button>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+
+async function runTest(endpoint, resultElId, formatter) {
+  document.getElementById('functional-error').textContent = '';
+  const res = await JointX.api(endpoint, 'POST', {screening_id: screeningId});
+  const el = document.getElementById(resultElId);
+  if (res.success) {
+    el.textContent = formatter(res.data) + (res.data.is_demo ? ' (DEMO DATA)' : '');
+  } else {
+    document.getElementById('functional-error').textContent = res.error;
+  }
+}
+
+document.getElementById('run-sit-to-stand-btn').addEventListener('click', () =>
+  runTest('/api/functional/sit-to-stand', 'sit-to-stand-result', d => `${JointXI18n.t('func.sit_to_stand_title').replace(/^\d+\.\s*/, '')}: ${d.sit_to_stand_time}s`));
+
+document.getElementById('run-squat-btn').addEventListener('click', () =>
+  runTest('/api/functional/squat', 'squat-result', d => `${JointXI18n.t('func.squat_title').replace(/^\d+\.\s*/, '')} ROM: ${d.squat_rom}°`));
+
+document.getElementById('run-balance-btn').addEventListener('click', () =>
+  runTest('/api/functional/balance', 'balance-result', d => `${JointXI18n.t('func.balance_title').replace(/^\d+\.\s*/, '')}: ${d.balance_stability}`));
+
+document.getElementById('run-turn-btn').addEventListener('click', () =>
+  runTest('/api/functional/turn', 'turn-result', d => `${JointXI18n.t('func.turn_title').replace(/^\d+\.\s*/, '')}: ${d.turn_duration}s`));
+
+document.getElementById('continue-btn').addEventListener('click', () => {
+  window.location.href = '/screening/' + screeningId + '/processing';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Patient Profile — JointX{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 id="patient-name">Loading...</h1>
+  <button id="new-screening-btn" class="btn btn-primary">Start New Screening</button>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <h2>Patient Details</h2>
+    <dl class="detail-list" id="patient-details"></dl>
+  </div>
+  <div class="card">
+    <h2>Screening History</h2>
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Status</th><th>Risk</th><th></th></tr></thead>
+      <tbody id="history-tbody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const patientId = {{ patient_id }};
+
+async function loadPatient() {
+  const res = await JointX.api('/api/patients/' + patientId, 'GET');
+  if (!res.success) return;
+  const p = res.data;
+  document.getElementById('patient-name').textContent = p.full_name + ' (' + p.patient_code + ')';
+  document.getElementById('patient-details').innerHTML = `
+    <dt>Age</dt><dd>${p.age ?? '—'}</dd>
+    <dt>Sex</dt><dd>${p.sex ?? '—'}</dd>
+    <dt>Height</dt><dd>${p.height_cm ?? '—'} cm</dd>
+    <dt>Weight</dt><dd>${p.weight_kg ?? '—'} kg</dd>
+    <dt>BMI</dt><dd>${p.bmi ?? '—'}</dd>
+    <dt>Area</dt><dd>${p.village_or_area ?? '—'}</dd>
+    <dt>Phone</dt><dd>${p.contact_phone ?? '—'}</dd>
+  `;
+  const tbody = document.getElementById('history-tbody');
+  tbody.innerHTML = '';
+  p.screening_history.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.started_at}</td><td>${s.status}</td>
+      <td><span class="pill risk-${(s.risk_label||'pending').toLowerCase()}">${s.risk_label || 'PENDING'}</span></td>
+      <td><a class="btn btn-small" href="/screening/${s.id}/results">View</a></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('new-screening-btn').addEventListener('click', () => {
+  window.location.href = '/screening/new/' + patientId;
+});
+
+loadPatient();
+</script>
+{% endblock %}

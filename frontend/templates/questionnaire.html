@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Questionnaire — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1 data-i18n="q.title">OA Screening Questionnaire</h1></div>
+<div class="progress-steps">
+  <span class="step active" data-i18n="q.step_questionnaire">1. Questionnaire</span>
+  <span class="step" data-i18n="q.step_gait">2. Gait Test</span>
+  <span class="step" data-i18n="q.step_imu">3. IMU Test</span>
+  <span class="step" data-i18n="q.step_functional">4. Functional Tests</span>
+  <span class="step" data-i18n="q.step_results">5. Results</span>
+</div>
+<div class="card form-card">
+  <form id="q-form">
+    {% for field, label, key in [
+      ('pain_score','Pain score (0–10)','q.pain_score'),
+      ('stiffness_score','Stiffness score (0–10)','q.stiffness_score'),
+      ('mobility_difficulty','Mobility difficulty (0–10)','q.mobility_difficulty'),
+      ('walking_difficulty','Walking difficulty (0–10)','q.walking_difficulty'),
+      ('stairs_difficulty','Difficulty climbing stairs (0–10)','q.stairs_difficulty'),
+      ('standing_difficulty','Difficulty standing (0–10)','q.standing_difficulty'),
+      ('sit_to_stand_difficulty','Sit/stand transition difficulty (0–10)','q.sit_to_stand_difficulty')
+    ] %}
+    <label data-i18n="{{ key }}">{{ label }}</label>
+    <input type="range" min="0" max="10" value="0" id="{{ field }}" oninput="document.getElementById('{{ field }}_val').textContent=this.value">
+    <span id="{{ field }}_val">0</span>
+    {% endfor %}
+    <label data-i18n="q.previous_joint_problems">Previous joint problems</label>
+    <textarea id="previous_joint_problems" rows="2"></textarea>
+    <label data-i18n="q.lifestyle_notes">Lifestyle / activity notes</label>
+    <textarea id="lifestyle_notes" rows="2"></textarea>
+    <button type="submit" class="btn btn-primary btn-block" data-i18n="q.submit">Save &amp; Continue to Camera Setup</button>
+    <p id="form-error" class="error-text"></p>
+  </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+document.getElementById('q-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fields = ['pain_score','stiffness_score','mobility_difficulty','walking_difficulty',
+    'stairs_difficulty','standing_difficulty','sit_to_stand_difficulty'];
+  const payload = {screening_id: screeningId};
+  fields.forEach(f => payload[f] = parseInt(document.getElementById(f).value, 10));
+  payload.previous_joint_problems = document.getElementById('previous_joint_problems').value;
+  payload.lifestyle_notes = document.getElementById('lifestyle_notes').value;
+
+  const res = await JointX.api('/api/questionnaire', 'POST', payload);
+  if (res.success) {
+    window.location.href = '/screening/' + screeningId + '/gait';
+  } else {
+    document.getElementById('form-error').textContent = res.error;
+  }
+});
+</script>
+{% endblock %}

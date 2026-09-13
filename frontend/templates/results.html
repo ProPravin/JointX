@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Results — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1 data-i18n="results.title">Screening Risk Result</h1></div>
+<div class="progress-steps">
+  <span class="step done" data-i18n="q.step_questionnaire">1. Questionnaire</span>
+  <span class="step done" data-i18n="q.step_gait">2. Gait Test</span>
+  <span class="step done" data-i18n="q.step_imu">3. IMU Test</span>
+  <span class="step done" data-i18n="q.step_functional">4. Functional Tests</span>
+  <span class="step active" data-i18n="q.step_results">5. Results</span>
+</div>
+
+<div id="prototype-banner" class="banner banner-warning hidden"></div>
+<div id="demo-banner" class="banner banner-info hidden"></div>
+
+<div class="card">
+  <div class="section-heading-row">
+    <h2 data-i18n="results.risk_category">Risk Category</h2>
+    <button type="button" class="tts-btn" data-tts-text-fn="resultsSpeechText" title="Listen" aria-label="Listen">
+      <span class="tts-icon">🔊</span><span data-i18n="results.listen">Listen</span>
+    </button>
+  </div>
+  <div id="risk-label-box" class="risk-label-box">—</div>
+  <p id="risk-score-text"></p>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 data-i18n="results.key_factors">Key Contributing Features</h2>
+    <div id="shap-list"></div>
+  </div>
+  <div class="card">
+    <h2 data-i18n="results.data_quality">Data Quality</h2>
+    <dl class="detail-list" id="quality-list"></dl>
+  </div>
+</div>
+
+<div class="card banner banner-disclaimer">
+  <p><strong>{{ disclaimer }}</strong></p>
+  <p id="further-eval-text"></p>
+</div>
+
+<div class="button-row">
+  <a id="review-link" class="btn btn-primary" href="#" data-i18n="results.proceed_review">Proceed to Healthcare-Worker Review</a>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+document.getElementById('review-link').href = '/screening/' + screeningId + '/review';
+
+let _speechState = { riskLabel: '', riskScore: null, topFeatures: [], furtherEval: '' };
+
+function resultsSpeechText() {
+  const parts = [];
+  if (_speechState.riskLabel) {
+    parts.push(`The AI-assessed osteoarthritis risk category is ${JointXI18n.t('common.' + _speechState.riskLabel.toLowerCase())}.`);
+  }
+  if (_speechState.riskScore != null) {
+    parts.push(`Model score: ${_speechState.riskScore}.`);
+  }
+  if (_speechState.topFeatures.length) {
+    const top = _speechState.topFeatures.slice(0, 3).map(f => {
+      const dir = f.contribution > 0 ? JointXI18n.t('results.increases_risk') : JointXI18n.t('results.decreases_risk');
+      return `${f.feature}, which ${dir}`;
+    }).join('; ');
+    parts.push(`Key contributing features: ${top}.`);
+  }
+  if (_speechState.furtherEval) parts.push(_speechState.furtherEval);
+  return parts.join(' ');
+}
+
+async function loadResults() {
+  const predRes = await JointX.api('/api/prediction/' + screeningId, 'GET');
+  const shapRes = await JointX.api('/api/shap/' + screeningId, 'GET');
+  const screeningRes = await JointX.api('/api/screenings/' + screeningId, 'GET');
+
+  if (predRes.success) {
+    const p = predRes.data;
+    const box = document.getElementById('risk-label-box');
+    box.textContent = JointXI18n.t('common.' + p.risk_label.toLowerCase());
+    box.className = 'risk-label-box risk-' + p.risk_label.toLowerCase();
+    document.getElementById('risk-score-text').textContent = p.risk_score != null ? ('Model score: ' + p.risk_score) : '';
+    _speechState.riskLabel = p.risk_label;
+    _speechState.riskScore = p.risk_score;
+
+    if (p.is_prototype) {
+      const b = document.getElementById('prototype-banner');
+      b.classList.remove('hidden');
+      b.textContent = 'Demo/Prototype Output — Not Clinical Prediction';
+    }
+    if (p.risk_label === 'MODERATE' || p.risk_label === 'HIGH') {
+      const msg = 'Further clinical evaluation is recommended.';
+      document.getElementById('further-eval-text').textContent = msg;
+      _speechState.furtherEval = msg;
+    }
+  }
+
+  if (shapRes.success) {
+    _speechState.topFeatures = shapRes.data.top_features;
+    const list = document.getElementById('shap-list');
+    list.innerHTML = '';
+    shapRes.data.top_features.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'shap-row';
+      const arrow = f.contribution > 0 ? ('▲ ' + JointXI18n.t('results.increases_risk')) : ('▼ ' + JointXI18n.t('results.decreases_risk'));
+      row.innerHTML = `<span>${f.feature}</span><span>value: ${f.value}</span><span>${arrow}</span>`;
+      list.appendChild(row);
+    });
+  }
+
+  if (screeningRes.success) {
+    const s = screeningRes.data;
+    if (s.screening.is_demo || (s.gait_features && s.gait_features.is_demo)) {
+      const b = document.getElementById('demo-banner');
+      b.classList.remove('hidden');
+      b.textContent = 'DEMO DATA — NOT CLINICAL DATA';
+    }
+    const q = document.getElementById('quality-list');
+    q.innerHTML = `
+      <dt>${JointXI18n.t('results.gait_quality')}</dt><dd>${s.gait_features ? s.gait_features.data_quality_ok : '—'}</dd>
+      <dt>${JointXI18n.t('results.imu_quality')}</dt><dd>${s.imu_features ? s.imu_features.data_quality_ok : '—'}</dd>
+      <dt>${JointXI18n.t('results.functional_quality')}</dt><dd>${s.functional_features ? [s.functional_features.sit_to_stand_ok, s.functional_features.squat_ok, s.functional_features.balance_ok, s.functional_features.turn_ok].filter(Boolean).length + '/4' : '0/4'}</dd>
+    `;
+  }
+}
+loadResults();
+</script>
+{% endblock %}

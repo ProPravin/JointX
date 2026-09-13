@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Register Patient — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Register New Patient</h1></div>
+<div class="card form-card">
+  <form id="patient-form">
+    <label>Full Name *</label>
+    <input type="text" id="full_name" required>
+
+    <div class="form-row">
+      <div><label>Age</label><input type="number" id="age" min="0" max="120"></div>
+      <div><label>Sex</label>
+        <select id="sex"><option value="">--</option><option>M</option><option>F</option><option>OTHER</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Height (cm)</label><input type="number" id="height_cm" step="0.1"></div>
+      <div><label>Weight (kg)</label><input type="number" id="weight_kg" step="0.1"></div>
+    </div>
+    <label>Village / Area</label>
+    <input type="text" id="village_or_area">
+    <label>Contact Phone</label>
+    <input type="text" id="contact_phone">
+    <button type="submit" class="btn btn-primary btn-block">Register Patient</button>
+    <p id="form-error" class="error-text"></p>
+  </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('patient-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    full_name: document.getElementById('full_name').value,
+    age: document.getElementById('age').value || null,
+    sex: document.getElementById('sex').value || null,
+    height_cm: document.getElementById('height_cm').value || null,
+    weight_kg: document.getElementById('weight_kg').value || null,
+    village_or_area: document.getElementById('village_or_area').value,
+    contact_phone: document.getElementById('contact_phone').value,
+  };
+  const res = await JointX.api('/api/patients', 'POST', payload);
+  if (res.success) {
+    window.location.href = '/patients/' + res.data.id;
+  } else {
+    document.getElementById('form-error').textContent = res.error;
+  }
+});
+</script>
+{% endblock %}

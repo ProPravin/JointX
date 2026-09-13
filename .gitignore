@@ -1,0 +1,42 @@
+# Environment / secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Database (never commit real patient data)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.db-journal
+
+# Logs
+logs/*.log
+
+# Datasets / trained models (never commit real patient data or PHI)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+training/datasets/*
+!training/datasets/.gitkeep
+ml/models/*.json
+ml/models/*.pkl
+ml/models/*.bin
+!ml/models/README.md
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local AI tool config (not shared)
+.claude/

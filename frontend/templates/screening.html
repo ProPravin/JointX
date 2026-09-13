@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}New Screening — JointX{% endblock %}
+{% block content %}
+<div class="centered-page">
+  <div class="card">
+    <h1>Starting New Screening</h1>
+    {% if demo_mode %}<div class="banner banner-info">DEMO MODE — simulated sensor data will be used where hardware is unavailable.</div>{% endif %}
+    <p id="status-text">Creating screening session...</p>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(async () => {
+  const patientId = {{ patient_id }};
+  const res = await JointX.api('/api/screenings', 'POST', {patient_id: patientId});
+  if (res.success) {
+    window.location.href = '/screening/' + res.data.id + '/questionnaire';
+  } else {
+    document.getElementById('status-text').textContent = 'Error: ' + res.error;
+  }
+})();
+</script>
+{% endblock %}

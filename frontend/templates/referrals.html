@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Referrals — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Referral Management</h1></div>
+<div class="card">
+  <div class="filter-row">
+    <label>Filter by status:</label>
+    <select id="status-filter">
+      <option value="">All</option>
+      <option value="NOT_REFERRED">Not Referred</option>
+      <option value="REFERRAL_CREATED">Referral Created</option>
+      <option value="PENDING">Pending</option>
+      <option value="TELECONSULT_COMPLETED">Teleconsult Completed</option>
+      <option value="CLINICAL_VISIT_COMPLETED">Clinical Visit Completed</option>
+      <option value="FOLLOW_UP_REQUIRED">Follow-up Required</option>
+      <option value="CLOSED">Closed</option>
+    </select>
+  </div>
+  <table class="data-table">
+    <thead><tr><th>Patient</th><th>Status</th><th>Notes</th><th>Created</th><th>Update</th></tr></thead>
+    <tbody id="referrals-tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const STATUSES = ['NOT_REFERRED','REFERRAL_CREATED','PENDING','TELECONSULT_COMPLETED',
+  'CLINICAL_VISIT_COMPLETED','FOLLOW_UP_REQUIRED','CLOSED'];
+
+async function loadReferrals() {
+  const status = document.getElementById('status-filter').value;
+  const url = '/api/referrals' + (status ? ('?status=' + status) : '');
+  const res = await JointX.api(url, 'GET');
+  const tbody = document.getElementById('referrals-tbody');
+  tbody.innerHTML = '';
+  if (!res.success) return;
+  res.data.forEach(r => {
+    const tr = document.createElement('tr');
+    const options = STATUSES.map(s => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${s}</option>`).join('');
+    tr.innerHTML = `<td>${r.full_name} (${r.patient_code})</td>
+      <td><span class="pill">${r.status}</span></td>
+      <td>${r.notes || ''}</td>
+      <td>${r.created_at}</td>
+      <td><select data-id="${r.id}" class="status-select">${options}</select></td>`;
+    tbody.appendChild(tr);
+  });
+  document.querySelectorAll('.status-select').forEach(sel => {
+    sel.addEventListener('change', async (e) => {
+      await JointX.api('/api/referrals/' + e.target.dataset.id, 'PUT', {status: e.target.value});
+      loadReferrals();
+    });
+  });
+}
+document.getElementById('status-filter').addEventListener('change', loadReferrals);
+loadReferrals();
+</script>
+{% endblock %}

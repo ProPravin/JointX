@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Gait Analysis — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1 data-i18n="gait.title">Camera Gait Test</h1></div>
+<div class="progress-steps">
+  <span class="step done" data-i18n="q.step_questionnaire">1. Questionnaire</span>
+  <span class="step active" data-i18n="q.step_gait">2. Gait Test</span>
+  <span class="step" data-i18n="q.step_imu">3. IMU Test</span>
+  <span class="step" data-i18n="q.step_functional">4. Functional Tests</span>
+  <span class="step" data-i18n="q.step_results">5. Results</span>
+</div>
+<div class="card">
+  {% if demo_mode %}<div class="banner banner-info">DEMO DATA — NOT CLINICAL DATA. Simulated gait data will be used.</div>{% endif %}
+  <p data-i18n="gait.instructions">Position the patient so their full body is visible, walking a short straight path in front of the camera, then start the test.</p>
+  <video id="camera-preview" autoplay muted playsinline class="camera-preview"></video>
+  <div class="button-row">
+    <button id="start-camera-btn" class="btn btn-ghost" data-i18n="gait.enable_camera">Enable Camera Preview</button>
+    <button id="run-gait-btn" class="btn btn-primary" data-i18n="gait.run_test">Run Gait Test</button>
+  </div>
+  <div id="gait-result" class="result-box hidden"></div>
+  <p id="gait-error" class="error-text"></p>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+
+document.getElementById('start-camera-btn').addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video: true});
+    document.getElementById('camera-preview').srcObject = stream;
+  } catch (err) {
+    document.getElementById('gait-error').textContent = 'Camera preview unavailable in browser: ' + err.message +
+      ' (server-side capture/demo mode will still be used for the actual test).';
+  }
+});
+
+document.getElementById('run-gait-btn').addEventListener('click', async () => {
+  document.getElementById('gait-error').textContent = '';
+  const res = await JointX.api('/api/gait/analyze', 'POST', {screening_id: screeningId});
+  const box = document.getElementById('gait-result');
+  if (res.success) {
+    const d = res.data;
+    box.classList.remove('hidden');
+    box.innerHTML = `<h3>${JointXI18n.t('gait.complete')} ${d.is_demo ? '(DEMO DATA)' : ''}</h3>
+      <p>${JointXI18n.t('gait.cadence')}: ${d.cadence} steps/min &nbsp; ${JointXI18n.t('gait.asymmetry')}: ${d.left_right_asymmetry}%</p>
+      <p>${JointXI18n.t('gait.knee_rom')}: ${d.knee_angle_rom}° &nbsp; ${JointXI18n.t('gait.stride_time')}: ${d.stride_time}s</p>
+      <button class="btn btn-primary" onclick="window.location.href='/screening/${screeningId}/imu'">${JointXI18n.t('gait.continue_imu')}</button>`;
+  } else {
+    document.getElementById('gait-error').textContent = res.error;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Review — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Healthcare-Worker Review</h1></div>
+<div class="card form-card">
+  <p>Review the AI risk result and record your clinical judgement notes below.</p>
+  <form id="review-form">
+    <label>Do you agree with the model's risk category?</label>
+    <select id="agrees_with_model">
+      <option value="1">Yes, I agree</option>
+      <option value="0">No, I disagree</option>
+    </select>
+    <label id="clinician-label-label">Your clinical risk category (required if you disagree; used as ground truth for future model training)</label>
+    <select id="clinician_label">
+      <option value="">— Not specified —</option>
+      <option value="LOW">LOW</option>
+      <option value="MODERATE">MODERATE</option>
+      <option value="HIGH">HIGH</option>
+    </select>
+    <label>Notes *</label>
+    <textarea id="notes" rows="4" required placeholder="Clinical observations, follow-up plan, etc."></textarea>
+    <button type="submit" class="btn btn-primary btn-block">Save Review</button>
+    <p id="review-error" class="error-text"></p>
+  </form>
+</div>
+<div class="card">
+  <h2>Referral</h2>
+  <form id="referral-form">
+    <label>Referral Status</label>
+    <select id="referral_status">
+      <option value="NOT_REFERRED">Not Referred</option>
+      <option value="REFERRAL_CREATED">Referral Created</option>
+      <option value="PENDING">Pending</option>
+      <option value="TELECONSULT_COMPLETED">Teleconsult Completed</option>
+      <option value="CLINICAL_VISIT_COMPLETED">Clinical Visit Completed</option>
+      <option value="FOLLOW_UP_REQUIRED">Follow-up Required</option>
+      <option value="CLOSED">Closed</option>
+    </select>
+    <label>Referral Notes</label>
+    <textarea id="referral_notes" rows="2"></textarea>
+    <button type="submit" class="btn btn-secondary btn-block">Save Referral</button>
+  </form>
+</div>
+<div class="button-row">
+  <a class="btn btn-primary" id="report-link" href="#">Generate Report &amp; Finish Screening</a>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+document.getElementById('report-link').href = '/reports/' + screeningId;
+
+document.getElementById('review-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const clinicianLabel = document.getElementById('clinician_label').value;
+  const payload = {
+    screening_id: screeningId,
+    notes: document.getElementById('notes').value,
+    agrees_with_model: parseInt(document.getElementById('agrees_with_model').value, 10),
+    clinician_label: clinicianLabel || null,
+  };
+  const res = await JointX.api('/api/review', 'POST', payload);
+  document.getElementById('review-error').textContent = res.success ? 'Review saved.' : res.error;
+});
+
+document.getElementById('referral-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    screening_id: screeningId,
+    status: document.getElementById('referral_status').value,
+    notes: document.getElementById('referral_notes').value,
+  };
+  await JointX.api('/api/referrals', 'POST', payload);
+  alert('Referral saved.');
+});
+</script>
+{% endblock %}

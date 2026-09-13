@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — JointX{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Welcome{% if worker_name %}, {{ worker_name }}{% endif %}</h1>
+  {% if role_tier in ("worker", "admin") %}<a href="/patients/new" class="btn btn-primary" data-i18n="dash.new_patient">+ New Patient</a>{% endif %}
+</div>
+
+<div class="stat-grid" id="stat-grid">
+  <div class="stat-card"><span class="stat-value" id="stat-patients">—</span><span class="stat-label" data-i18n="dash.stat_patients">Total Patients</span></div>
+  <div class="stat-card"><span class="stat-value" id="stat-screenings">—</span><span class="stat-label" data-i18n="dash.stat_screenings">Total Screenings</span></div>
+  <div class="stat-card"><span class="stat-value" id="stat-pending-referrals">—</span><span class="stat-label" data-i18n="dash.stat_pending_referrals">Pending Referrals</span></div>
+  <div class="stat-card"><span class="stat-value" id="stat-followup">—</span><span class="stat-label" data-i18n="dash.stat_followup">Follow-up Cases</span></div>
+  <div class="stat-card"><span class="stat-value" id="stat-unsynced">—</span><span class="stat-label" data-i18n="dash.stat_unsynced">Unsynced Records</span></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 data-i18n="dash.risk_distribution">Risk Distribution</h2>
+    <div id="risk-distribution" class="risk-bars"></div>
+  </div>
+  <div class="card">
+    <h2 data-i18n="dash.recent_screenings">Recent Screenings</h2>
+    <table class="data-table" id="recent-screenings-table">
+      <thead><tr><th data-i18n="dash.col_patient">Patient</th><th data-i18n="dash.col_date">Date</th><th data-i18n="dash.col_risk">Risk</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function loadDashboard() {
+  const res = await JointX.api('/api/screenings/dashboard/summary', 'GET');
+  if (!res.success) return;
+  const d = res.data;
+  document.getElementById('stat-patients').textContent = d.total_patients;
+  document.getElementById('stat-screenings').textContent = d.total_screenings;
+  document.getElementById('stat-pending-referrals').textContent = d.pending_referrals;
+  document.getElementById('stat-followup').textContent = d.follow_up_cases;
+  document.getElementById('stat-unsynced').textContent = d.unsynced_records;
+
+  const dist = document.getElementById('risk-distribution');
+  dist.innerHTML = '';
+  ['LOW', 'MODERATE', 'HIGH'].forEach(label => {
+    const count = d.risk_distribution[label] || 0;
+    const row = document.createElement('div');
+    row.className = 'risk-bar-row';
+    row.innerHTML = `<span class="risk-bar-label risk-${label.toLowerCase()}">${JointXI18n.t('common.' + label.toLowerCase())}</span><span>${count}</span>`;
+    dist.appendChild(row);
+  });
+
+  const tbody = document.querySelector('#recent-screenings-table tbody');
+  tbody.innerHTML = '';
+  d.recent_screenings.forEach(s => {
+    const tr = document.createElement('tr');
+    const riskKey = 'common.' + (s.risk_label ? s.risk_label.toLowerCase() : 'pending');
+    tr.innerHTML = `<td>${s.full_name} (${s.patient_code})</td><td>${s.started_at}</td>
+      <td><span class="pill risk-${(s.risk_label||'pending').toLowerCase()}">${JointXI18n.t(riskKey)}</span></td>`;
+    tbody.appendChild(tr);
+  });
+}
+loadDashboard();
+</script>
+{% endblock %}

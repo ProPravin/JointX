@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}IMU Analysis — JointX{% endblock %}
+{% block content %}
+<div class="page-header"><h1 data-i18n="imu.title">Dual IMU Movement Test</h1></div>
+<div class="progress-steps">
+  <span class="step done" data-i18n="q.step_questionnaire">1. Questionnaire</span>
+  <span class="step done" data-i18n="q.step_gait">2. Gait Test</span>
+  <span class="step active" data-i18n="q.step_imu">3. IMU Test</span>
+  <span class="step" data-i18n="q.step_functional">4. Functional Tests</span>
+  <span class="step" data-i18n="q.step_results">5. Results</span>
+</div>
+<div class="card">
+  {% if demo_mode %}<div class="banner banner-info">DEMO DATA — NOT CLINICAL DATA. Simulated IMU data will be used if sensors are not connected.</div>{% endif %}
+  <ol class="instructions">
+    <li data-i18n="imu.instructions1">Attach one MPU6050 sensor to each lower limb (left and right).</li>
+    <li data-i18n="imu.instructions2">Calibrate with the patient standing still.</li>
+    <li data-i18n="imu.instructions3">Ask the patient to perform a short walking/knee-bend movement.</li>
+  </ol>
+  <div class="button-row">
+    <button id="calibrate-btn" class="btn btn-ghost" data-i18n="imu.calibrate">1. Calibrate</button>
+    <button id="run-imu-btn" class="btn btn-primary" disabled data-i18n="imu.run_test">2. Run Movement Test</button>
+  </div>
+  <div id="imu-result" class="result-box hidden"></div>
+  <p id="imu-error" class="error-text"></p>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const screeningId = {{ screening_id }};
+
+document.getElementById('calibrate-btn').addEventListener('click', async () => {
+  document.getElementById('imu-error').textContent = '';
+  const res = await JointX.api('/api/imu/calibrate', 'POST', {});
+  if (res.success) {
+    document.getElementById('run-imu-btn').disabled = false;
+    document.getElementById('calibrate-btn').textContent = JointXI18n.t('imu.calibrated') + (res.data.is_demo ? ' (Simulated)' : '');
+  } else {
+    document.getElementById('imu-error').textContent = res.error;
+  }
+});
+
+document.getElementById('run-imu-btn').addEventListener('click', async () => {
+  document.getElementById('imu-error').textContent = '';
+  const res = await JointX.api('/api/imu/analyze', 'POST', {screening_id: screeningId});
+  const box = document.getElementById('imu-result');
+  if (res.success) {
+    const d = res.data;
+    box.classList.remove('hidden');
+    box.innerHTML = `<h3>${JointXI18n.t('imu.complete')} ${d.is_demo ? '(DEMO DATA)' : ''}</h3>
+      <p>${JointXI18n.t('imu.angular_velocity')}: ${d.angular_velocity_rms} &nbsp; ${JointXI18n.t('imu.joint_rom')}: ${d.relative_joint_rom}°</p>
+      <p>${JointXI18n.t('imu.smoothness')}: ${d.movement_smoothness} &nbsp; ${JointXI18n.t('imu.cycle_duration')}: ${d.movement_cycle_duration}s</p>
+      <button class="btn btn-primary" onclick="window.location.href='/screening/${screeningId}/functional'">${JointXI18n.t('imu.continue_functional')}</button>`;
+  } else {
+    document.getElementById('imu-error').textContent = res.error;
+  }
+});
+</script>
+{% endblock %}

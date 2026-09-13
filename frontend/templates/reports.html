@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Report — JointX{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 data-i18n="report.title">Screening Report</h1>
+  <div class="button-row">
+    <button type="button" class="tts-btn" data-tts-target="report-text" title="Listen" aria-label="Listen">
+      <span class="tts-icon">🔊</span><span data-i18n="results.listen">Listen</span>
+    </button>
+    <a class="btn btn-secondary" id="download-link" href="#" download="jointx_report.txt" data-i18n="report.download_txt">Download .txt</a>
+    <button class="btn btn-secondary" id="download-pdf-btn" data-i18n="report.download_pdf">Download PDF</button>
+    <button id="finalize-btn" class="btn btn-primary" data-i18n="report.finalize">Finalize &amp; Queue for Sync</button>
+  </div>
+</div>
+<div class="card">
+  <pre id="report-text" class="report-pre" data-i18n="report.loading">Loading report...</pre>
+</div>
+<p id="finalize-msg" class="hint"></p>
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const screeningId = {{ screening_id }};
+document.getElementById('download-link').href = '/api/reports/' + screeningId + '/text';
+
+let _reportData = null;
+
+async function loadReport() {
+  const textRes = await fetch('/api/reports/' + screeningId + '/text');
+  document.getElementById('report-text').textContent = await textRes.text();
+
+  const jsonRes = await JointX.api('/api/reports/' + screeningId, 'GET');
+  if (jsonRes.success) _reportData = jsonRes.data;
+}
+loadReport();
+
+document.getElementById('finalize-btn').addEventListener('click', async () => {
+  const res = await JointX.api('/api/reports/' + screeningId + '/finalize', 'POST', {});
+  document.getElementById('finalize-msg').textContent = res.success
+    ? JointXI18n.t('report.finalize_success')
+    : ('Error: ' + res.error);
+});
+
+/* ---------------- Real PDF generation from the structured report JSON ---------------- */
+function buildReportPdf(r) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const marginX = 40, pageW = 515;
+  const pageH = doc.internal.pageSize.getHeight();
+  let y = 54;
+
+  function ensureSpace(need) { if (y > pageH - (need || 60)) { doc.addPage(); y = 54; } }
+  function heading(text, size) {
+    ensureSpace(30);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(size);
+    doc.setTextColor(17, 26, 46); doc.text(text, marginX, y);
+    y += size * 1.3;
+  }
+  function subtitle(text) {
+    ensureSpace(20);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    doc.setTextColor(120, 132, 154); doc.text(text, marginX, y);
+    y += 20;
+  }
+  function sectionHeading(text) {
+    ensureSpace(30);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.setTextColor(49, 87, 213); doc.text(text, marginX, y);
+    y += 6;
+    doc.setDrawColor(226, 231, 240); doc.line(marginX, y + 4, marginX + pageW, y + 4);
+    y += 16;
+  }
+  function kvRow(label, value) {
+    ensureSpace(18);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+    doc.setTextColor(104, 117, 140); doc.text(String(label), marginX, y);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(23, 32, 51);
+    doc.text(String(value == null ? 'N/A' : value), marginX + 220, y);
+    y += 16;
+  }
+  function paragraph(text, color) {
+    if (!text) return;
+    ensureSpace(20);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+    const c = color || [44, 53, 80];
+    doc.setTextColor(c[0], c[1], c[2]);
+    doc.splitTextToSize(text, pageW).forEach((l) => { ensureSpace(16); doc.text(l, marginX, y); y += 14; });
+    y += 4;
+  }
+
+  const p = r.patient || {}, s = r.screening || {}, q = r.questionnaire || {};
+  const gait = r.gait_features || {}, imu = r.imu_features || {}, func = r.functional_features || {};
+  const pred = r.prediction || {};
+
+  heading('JOINTX SCREENING REPORT', 18);
+  subtitle('Screening ID ' + s.id + '   ·   ' + (s.started_at || ''));
+  y += 4;
+
+  sectionHeading('Patient');
+  kvRow('Name', p.full_name); kvRow('Patient code', p.patient_code);
+  kvRow('Age', p.age); kvRow('Sex', p.sex); kvRow('BMI', p.bmi);
+
+  sectionHeading('Questionnaire');
+  kvRow('Pain score', q.pain_score != null ? q.pain_score + ' / 10' : null);
+  kvRow('Stiffness score', q.stiffness_score != null ? q.stiffness_score + ' / 10' : null);
+  kvRow('Mobility difficulty', q.mobility_difficulty != null ? q.mobility_difficulty + ' / 10' : null);
+  kvRow('Walking difficulty', q.walking_difficulty != null ? q.walking_difficulty + ' / 10' : null);
+
+  sectionHeading('Gait Features' + (gait.is_demo ? ' (DEMO DATA)' : ''));
+  kvRow('Data quality OK', gait.data_quality_ok);
+  kvRow('Cadence', gait.cadence != null ? gait.cadence + ' steps/min' : null);
+  kvRow('Left-right asymmetry', gait.left_right_asymmetry != null ? gait.left_right_asymmetry + '%' : null);
+  kvRow('Knee angle ROM', gait.knee_angle_rom != null ? gait.knee_angle_rom + '°' : null);
+  kvRow('Stride time', gait.stride_time != null ? gait.stride_time + 's' : null);
+
+  sectionHeading('IMU Features' + (imu.is_demo ? ' (DEMO DATA)' : ''));
+  kvRow('Data quality OK', imu.data_quality_ok);
+  kvRow('Angular velocity RMS', imu.angular_velocity_rms);
+  kvRow('Relative joint ROM', imu.relative_joint_rom != null ? imu.relative_joint_rom + '°' : null);
+  kvRow('Movement smoothness', imu.movement_smoothness);
+
+  sectionHeading('Functional Tests' + (func.is_demo ? ' (DEMO DATA)' : ''));
+  kvRow('Sit-to-stand time', func.sit_to_stand_time != null ? func.sit_to_stand_time + 's' : null);
+  kvRow('Squat ROM', func.squat_rom != null ? func.squat_rom + '°' : null);
+  kvRow('Balance stability', func.balance_stability);
+  kvRow('Turn duration', func.turn_duration != null ? func.turn_duration + 's' : null);
+
+  sectionHeading('AI Risk Result');
+  kvRow('Risk category', pred.risk_label);
+  kvRow('Risk score', pred.risk_score);
+  kvRow('Prototype/unvalidated model', pred.is_prototype ? 'Yes' : 'No');
+
+  if (r.shap_explanation && r.shap_explanation.top_features && r.shap_explanation.top_features.length) {
+    sectionHeading('Key Contributing Features');
+    r.shap_explanation.top_features.forEach((f) => {
+      const dir = f.contribution > 0 ? 'increases risk' : 'decreases risk';
+      kvRow(f.feature, `${f.value} (${dir})`);
+    });
+  }
+
+  if (r.referrals && r.referrals.length) {
+    sectionHeading('Referral Status');
+    kvRow('Status', r.referrals[0].status);
+    if (r.referrals[0].notes) paragraph(r.referrals[0].notes);
+  }
+
+  y += 6;
+  if (r.demo_data_notice) paragraph(r.demo_data_notice, [150, 110, 20]);
+  if (r.prototype_notice) paragraph(r.prototype_notice, [150, 110, 20]);
+  if (r.further_evaluation_notice) paragraph(r.further_evaluation_notice, [154, 46, 46]);
+  paragraph(r.disclaimer, [104, 117, 140]);
+
+  return doc;
+}
+
+document.getElementById('download-pdf-btn').addEventListener('click', async () => {
+  if (!_reportData) {
+    const jsonRes = await JointX.api('/api/reports/' + screeningId, 'GET');
+    if (!jsonRes.success) { alert('Could not load report data: ' + jsonRes.error); return; }
+    _reportData = jsonRes.data;
+  }
+  const doc = buildReportPdf(_reportData);
+  const code = (_reportData.patient && _reportData.patient.patient_code) || screeningId;
+  doc.save(`JointX_Report_${code}.pdf`);
+});
+</script>
+{% endblock %}

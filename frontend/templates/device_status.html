@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Device Status — JointX{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Device Status</h1>
+  <button id="refresh-btn" class="btn btn-ghost">Refresh</button>
+</div>
+<div class="stat-grid" id="device-grid">
+  <div class="stat-card"><span class="stat-value" id="dev-camera">—</span><span class="stat-label">Camera</span></div>
+  <div class="stat-card"><span class="stat-value" id="dev-imu-left">—</span><span class="stat-label">IMU Left</span></div>
+  <div class="stat-card"><span class="stat-value" id="dev-imu-right">—</span><span class="stat-label">IMU Right</span></div>
+  <div class="stat-card"><span class="stat-value" id="dev-mode">—</span><span class="stat-label">Demo Mode</span></div>
+  <div class="stat-card"><span class="stat-value" id="dev-unsynced">—</span><span class="stat-label">Unsynced Records</span></div>
+</div>
+<div class="card">
+  <h2>Manual Sync</h2>
+  <button id="sync-btn" class="btn btn-primary">Attempt Sync Now</button>
+  <p id="sync-result" class="hint"></p>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function loadStatus() {
+  const res = await JointX.api('/api/device-status', 'GET');
+  if (!res.success) return;
+  const d = res.data;
+  document.getElementById('dev-camera').textContent = d.camera;
+  document.getElementById('dev-imu-left').textContent = d.imu_left + (d.imu_is_demo ? ' (SIM)' : '');
+  document.getElementById('dev-imu-right').textContent = d.imu_right + (d.imu_is_demo ? ' (SIM)' : '');
+  document.getElementById('dev-mode').textContent = d.demo_mode ? 'ON' : 'OFF';
+  document.getElementById('dev-unsynced').textContent = d.unsynced_records;
+}
+document.getElementById('refresh-btn').addEventListener('click', loadStatus);
+document.getElementById('sync-btn').addEventListener('click', async () => {
+  const res = await JointX.api('/api/sync', 'POST', {});
+  document.getElementById('sync-result').textContent = res.success
+    ? `Attempted: ${res.data.attempted}, Synced: ${res.data.synced}, Failed: ${res.data.failed}${res.data.reason ? ' (' + res.data.reason + ')' : ''}`
+    : res.error;
+  loadStatus();
+});
+loadStatus();
+</script>
+{% endblock %}
