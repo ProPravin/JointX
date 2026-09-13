@@ -23,10 +23,10 @@ sensitivity, or specificity numbers.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate            # or .venv\Scripts\activate on Windows
+.venv\Scripts\activate 
 pip install -r requirements.txt
 
-cp .env.example .env
+copy .env.example .env
 # .env already defaults JOINTX_DEMO_MODE=true — camera/IMU are simulated
 
 python app.py
