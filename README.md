@@ -32,16 +32,24 @@ cp .env.example .env
 python app.py
 ```
 
-Open http://localhost:5000 and log in with the seeded demo account:
+Open http://localhost:5000 — it always lands on the login page. One seeded
+account per role tier is created on first run (see `config/roles.py` for
+the tier mapping):
 
-```
-username: admin
-password: changeme123
-```
+| Role tier | Username | Password |
+|---|---|---|
+| Admin | `admin` | `changeme123` |
+| Healthcare Worker (ASHA) | `asha_field` | `AshaField@123` |
+| Doctor / Reviewer | `dr_reviewer` | `DrReview@123` |
 
-Change this password (or create new accounts) before any real deployment —
-`backend/services` has no self-serve account-creation UI yet; add one via
-`healthcare_workers` table administration or a future admin route.
+Logging in as each tier lands you on a different page (worker → register a
+patient, reviewer → patient list, admin → dashboard), and role tiers are
+enforced server-side (e.g. only worker/admin can start a screening; only
+reviewer/admin can submit a clinical review — see `backend/utils/security.py:require_role`).
+
+Change all three passwords (or create new accounts) before any real
+deployment — `backend/services` has no self-serve account-creation UI yet;
+add one via `healthcare_workers` table administration or a future admin route.
 
 ## Running tests
 
