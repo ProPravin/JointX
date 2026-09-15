@@ -21,14 +21,23 @@ CREATE TABLE IF NOT EXISTS healthcare_workers (
 
 CREATE TABLE IF NOT EXISTS patients (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    patient_code        TEXT NOT NULL UNIQUE,   -- human-friendly local ID
+    patient_code        TEXT NOT NULL UNIQUE,   -- human-friendly local ID -- NOT encrypted, used for plaintext search
+    -- full_name, contact_phone, village_or_area hold ENCRYPTED ciphertext
+    -- (base64 Fernet tokens), never plaintext -- see backend/utils/crypto.py,
+    -- the only module allowed to touch these values, and
+    -- backend/services/patient_service.py, the only module allowed to read/
+    -- write this table directly. A LIKE/partial-text search on these columns
+    -- no longer works (that's the accepted cost of encrypting them) -- use
+    -- the *_hash columns below for exact-match lookup instead.
     full_name           TEXT NOT NULL,
+    full_name_hash      TEXT,   -- HMAC-SHA256(normalized full_name) -- exact-match lookup/dedup without decrypting
     age                 INTEGER,
     sex                 TEXT,                   -- M/F/OTHER
     height_cm           REAL,
     weight_kg           REAL,
     village_or_area      TEXT,
     contact_phone       TEXT,
+    contact_phone_hash  TEXT,   -- HMAC-SHA256(normalized contact_phone) -- exact-match lookup/dedup without decrypting
     facility_name       TEXT,   -- copied from the registering worker at creation time; used to scope Healthcare Worker access to their own facility
     registered_by       INTEGER REFERENCES healthcare_workers(id),
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
@@ -224,3 +233,5 @@ CREATE INDEX IF NOT EXISTS idx_referrals_screening ON referrals(screening_id);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
 CREATE INDEX IF NOT EXISTS idx_audit_log_worker ON audit_log(worker_id);
 CREATE INDEX IF NOT EXISTS idx_patients_facility ON patients(facility_name);
+CREATE INDEX IF NOT EXISTS idx_patients_phone_hash ON patients(contact_phone_hash);
+CREATE INDEX IF NOT EXISTS idx_patients_name_hash ON patients(full_name_hash);

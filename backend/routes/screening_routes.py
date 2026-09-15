@@ -4,6 +4,7 @@ from backend.services import screening_service
 from backend.utils.security import login_required, require_role
 from backend.utils.validators import require_fields
 from backend.utils.helpers import api_success
+from backend.utils.crypto import decrypt_field
 from config.settings import Config
 
 screening_bp = Blueprint("screenings", __name__, url_prefix="/api/screenings")
@@ -49,7 +50,11 @@ def dashboard_summary():
                LEFT JOIN predictions pr ON pr.screening_id = s.id
                ORDER BY s.started_at DESC LIMIT 10"""
         )
-        recent_screenings = [dict(r) for r in cur.fetchall()]
+        recent_screenings = []
+        for r in cur.fetchall():
+            row = dict(r)
+            row["full_name"] = decrypt_field(row["full_name"])
+            recent_screenings.append(row)
 
         cur.execute(
             """SELECT risk_label, COUNT(*) c FROM predictions WHERE refused = 0 GROUP BY risk_label"""

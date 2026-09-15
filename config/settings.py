@@ -13,3 +13,4 @@ _spec.loader.exec_module(_module)
 
 Config = _module.Config
 INSECURE_DEFAULT_SECRET_KEY = _module.INSECURE_DEFAULT_SECRET_KEY
+BASE_DIR = _module.BASE_DIR

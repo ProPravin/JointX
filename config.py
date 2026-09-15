@@ -31,11 +31,27 @@ class Config:
     HOST = os.environ.get("JOINTX_HOST", "0.0.0.0")
     PORT = int(os.environ.get("JOINTX_PORT", "5000"))
 
-    # Database
-    DATABASE_PATH = os.environ.get(
-        "JOINTX_DB_PATH", os.path.join(BASE_DIR, "data", "jointx.db")
+    # Database -- deliberately NOT inside the application directory by
+    # default (spec: P1 data layer #3). A database living under the repo is
+    # how a real patient record ended up inside distributed zip files earlier
+    # in this project's history (see tests/test_release_hygiene.py). The
+    # three-layer model this follows:
+    #   Device data:  /var/lib/jointx/jointx.db  -- SQLite, encrypted, 0600
+    #   Application:  /opt/jointx/ (or wherever this repo is checked out) -- code only, no data
+    #   Central:      a separate host entirely -- PostgreSQL, TLS (see central_server/)
+    # On Windows (dev machines only -- production targets are Raspberry Pi/
+    # Linux) there's no /var/lib equivalent, so this falls back to a
+    # per-machine ProgramData-style directory that is still outside the repo.
+    _default_db_dir = "/var/lib/jointx" if os.name == "posix" else os.path.join(
+        os.environ.get("PROGRAMDATA", os.path.expanduser("~")), "JointX"
     )
+    DATABASE_PATH = os.environ.get("JOINTX_DB_PATH", os.path.join(_default_db_dir, "jointx.db"))
     SCHEMA_PATH = os.path.join(BASE_DIR, "database", "schema.sql")
+
+    # PHI column encryption (see backend/utils/crypto.py -- the only module
+    # allowed to use this key directly). Read from the environment only,
+    # never from a file inside the repo -- see docs/KEY_MANAGEMENT.md.
+    DATA_KEY = os.environ.get("JOINTX_DATA_KEY", "")
 
     # Session
     SESSION_LIFETIME_MINUTES = int(os.environ.get("JOINTX_SESSION_MINUTES", "60"))
@@ -109,6 +125,35 @@ class Config:
                 "    python -c \"import secrets; print(secrets.token_hex(32))\"\n"
                 "and set JOINTX_SECRET_KEY to it."
             )
+
+        if not cls.DATA_KEY:
+            fatal_errors.append(
+                "JOINTX_DATA_KEY is not set -- patient PHI (name/phone/village) cannot be "
+                "encrypted without it. Generate one with:\n"
+                "    python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n"
+                "and set JOINTX_DATA_KEY to it. See docs/KEY_MANAGEMENT.md."
+            )
+
+        db_real = os.path.realpath(cls.DATABASE_PATH)
+        app_real = os.path.realpath(BASE_DIR)
+        if db_real == app_real or db_real.startswith(app_real + os.sep):
+            fatal_errors.append(
+                f"JOINTX_DB_PATH ({cls.DATABASE_PATH}) is inside the application directory "
+                f"({BASE_DIR}). Point it somewhere outside the repo, e.g. /var/lib/jointx/jointx.db "
+                "-- a database inside the app directory is how a real patient record ended up "
+                "inside a distributed zip file before this check existed."
+            )
+
+        if os.name == "posix" and os.path.exists(cls.DATABASE_PATH):
+            import stat
+
+            mode = stat.S_IMODE(os.stat(cls.DATABASE_PATH).st_mode)
+            if mode & 0o077:
+                fatal_errors.append(
+                    f"{cls.DATABASE_PATH} is readable by group/other (mode {oct(mode)}). "
+                    f"Run: chmod 600 {cls.DATABASE_PATH}"
+                )
+
         if fatal_errors:
             raise RuntimeError(
                 "Refusing to start with DEMO_MODE=false and unsafe configuration:\n- "

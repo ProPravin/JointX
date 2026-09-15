@@ -29,13 +29,79 @@ def get_connection():
     if not hasattr(_local, "conn") or getattr(_local, "conn_path", None) != Config.DATABASE_PATH:
         if hasattr(_local, "conn"):
             _local.conn.close()
-        os.makedirs(os.path.dirname(Config.DATABASE_PATH), exist_ok=True)
+        db_dir = os.path.dirname(Config.DATABASE_PATH)
+        os.makedirs(db_dir, exist_ok=True)
+        _secure_db_directory(db_dir)
         conn = sqlite3.connect(Config.DATABASE_PATH, check_same_thread=False)
         conn.row_factory = _row_factory
         conn.execute("PRAGMA foreign_keys = ON")
+        # Durability/concurrency (spec: P1 data layer #5): the capture thread
+        # writes (gait/IMU/functional features) while Flask request handlers
+        # read concurrently. Rollback-journal mode (SQLite's default) throws
+        # "database is locked" under that pattern and recovers worse from the
+        # power cuts a rural PHC device will actually experience. WAL mode
+        # allows concurrent readers alongside a writer and is far more robust
+        # to an unclean shutdown.
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
         _local.conn = conn
         _local.conn_path = Config.DATABASE_PATH
+        _secure_db_file(Config.DATABASE_PATH)
+        _warn_if_db_location_unsafe(Config.DATABASE_PATH)
     return _local.conn
+
+
+def _warn_if_db_location_unsafe(db_path: str):
+    """
+    Always logs (regardless of DEMO_MODE) if the DB is somewhere risky --
+    Config.validate_for_production() additionally REFUSES to start over this
+    once DEMO_MODE is off, but a demo/dev run should still see the warning
+    rather than silently building the same bad habit that ends up shipped.
+    """
+    from backend.utils.logger import get_logger
+    from config.settings import BASE_DIR
+
+    logger = get_logger(__name__)
+    db_real = os.path.realpath(db_path)
+    app_real = os.path.realpath(BASE_DIR)
+    if db_real == app_real or db_real.startswith(app_real + os.sep):
+        logger.warning(
+            "SECURITY: database path %s is inside the application directory (%s). "
+            "This is how a real patient record ended up inside a distributed zip "
+            "file before this check existed -- set JOINTX_DB_PATH outside the repo.",
+            db_path, BASE_DIR,
+        )
+    if os.name == "posix" and os.path.exists(db_path):
+        import stat
+
+        mode = stat.S_IMODE(os.stat(db_path).st_mode)
+        if mode & 0o077:
+            logger.warning(
+                "SECURITY: %s is readable by group/other (mode %s). Run: chmod 600 %s",
+                db_path, oct(mode), db_path,
+            )
+
+
+def _secure_db_directory(db_dir: str):
+    """POSIX-only: 0700 so only the jointx service user can traverse into the
+    data directory at all (spec: P1 data layer #3). No-op on Windows, which
+    has no equivalent POSIX permission model -- rely on NTFS ACLs / physical
+    device security there instead."""
+    if os.name == "posix":
+        try:
+            os.chmod(db_dir, 0o700)
+        except OSError:
+            pass  # best-effort; don't crash startup over a permissions tweak
+
+
+def _secure_db_file(db_path: str):
+    """POSIX-only: 0600 so the database file itself isn't group/world-readable."""
+    if os.name == "posix" and os.path.exists(db_path):
+        try:
+            os.chmod(db_path, 0o600)
+        except OSError:
+            pass
 
 
 def close_connection():
@@ -80,6 +146,10 @@ _COLUMN_MIGRATIONS = {
     "predictions": [
         ("refused", "INTEGER NOT NULL DEFAULT 0"),
         ("refusal_reason", "TEXT"),
+    ],
+    "patients": [
+        ("full_name_hash", "TEXT"),
+        ("contact_phone_hash", "TEXT"),
     ],
 }
 

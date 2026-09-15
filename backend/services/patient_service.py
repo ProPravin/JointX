@@ -1,8 +1,37 @@
-"""Patient registration, search, and profile retrieval."""
+"""
+Patient registration, search, and profile retrieval.
+
+This is the ONLY module (besides backend/utils/crypto.py itself) allowed to
+read or write patients.full_name / contact_phone / village_or_area directly
+-- every other module that needs a patient's decrypted details must go
+through get_patient()/search_patients() here, or call decrypt_patient_row()
+on a raw row it already has (see backend/services/screening_service.py and
+backend/routes/screening_routes.py for the two other legitimate raw-SQL
+readers of the patients table, which both import decrypt_patient_row from
+here rather than duplicating decryption logic).
+"""
 from database.database import get_cursor
 from backend.utils.helpers import generate_patient_code, compute_bmi
 from backend.utils.validators import require_fields, validate_range, validate_sex
 from backend.utils.error_handler import JointXError
+from backend.utils import crypto
+
+ENCRYPTED_FIELDS = ("full_name", "contact_phone", "village_or_area")
+
+
+def decrypt_patient_row(row: dict) -> dict:
+    """
+    Returns a copy of a raw patients row with full_name/contact_phone/
+    village_or_area decrypted. Safe to call on a dict that's already
+    decrypted (Fernet ciphertext is distinguishable, but callers should
+    still only ever call this once per row) -- used by every module that
+    reads the patients table directly instead of through this service.
+    """
+    row = dict(row)
+    for field in ENCRYPTED_FIELDS:
+        if field in row:
+            row[field] = crypto.decrypt_field(row[field])
+    return row
 
 
 def create_patient(data: dict, registered_by: int) -> dict:
@@ -25,18 +54,20 @@ def create_patient(data: dict, registered_by: int) -> dict:
     with get_cursor(commit=True) as cur:
         cur.execute(
             """INSERT INTO patients
-               (patient_code, full_name, age, sex, height_cm, weight_kg,
-                village_or_area, contact_phone, facility_name, registered_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (patient_code, full_name, full_name_hash, age, sex, height_cm, weight_kg,
+                village_or_area, contact_phone, contact_phone_hash, facility_name, registered_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 patient_code,
-                data["full_name"],
+                crypto.encrypt_field(data["full_name"]),
+                crypto.hash_field(data["full_name"]),
                 data.get("age"),
                 data.get("sex"),
                 data.get("height_cm"),
                 data.get("weight_kg"),
-                data.get("village_or_area"),
-                data.get("contact_phone"),
+                crypto.encrypt_field(data.get("village_or_area")),
+                crypto.encrypt_field(data.get("contact_phone")),
+                crypto.hash_field(data.get("contact_phone")),
                 facility_name,
                 registered_by,
             ),
@@ -52,7 +83,7 @@ def get_patient(patient_id: int) -> dict:
         row = cur.fetchone()
     if not row:
         raise JointXError("Patient not found", status_code=404)
-    row = dict(row)
+    row = decrypt_patient_row(row)
     row["bmi"] = compute_bmi(row.get("height_cm"), row.get("weight_kg"))
     return row
 
@@ -63,13 +94,24 @@ def search_patients(query: str = "", facility_name: str = None, limit: int = 50)
     scope Healthcare Worker access to their own facility's patients (spec:
     Production-grade RBAC #3). Doctors/Reviewers and Admins pass None to see
     across facilities.
+
+    SEARCH BEHAVIOUR CHANGED BY ENCRYPTION (spec: P1 data layer #4): full_name
+    and contact_phone are ciphertext in the database, so a partial/fuzzy LIKE
+    match against them is no longer possible without decrypting every row
+    (which would defeat the point of encrypting them). `query` now matches:
+      - patient_code: partial match (LIKE), unencrypted, works as before
+      - full_name / contact_phone: EXACT match only, via the deterministic
+        hash columns (full_name_hash / contact_phone_hash)
+    village_or_area is no longer searchable at all (no hash column for it --
+    it wasn't a query target worth the extra dedup-key surface area).
     """
     clauses = []
     params = []
     if query:
         like = f"%{query}%"
-        clauses.append("(full_name LIKE ? OR patient_code LIKE ? OR village_or_area LIKE ?)")
-        params += [like, like, like]
+        name_hash = crypto.hash_field(query)
+        clauses.append("(patient_code LIKE ? OR full_name_hash = ? OR contact_phone_hash = ?)")
+        params += [like, name_hash, name_hash]
     if facility_name is not None:
         clauses.append("facility_name = ?")
         params.append(facility_name)
@@ -81,7 +123,7 @@ def search_patients(query: str = "", facility_name: str = None, limit: int = 50)
             (*params, limit),
         )
         rows = cur.fetchall()
-    return [dict(r) for r in rows]
+    return [decrypt_patient_row(r) for r in rows]
 
 
 def get_patient_risk_history(patient_id: int) -> list:

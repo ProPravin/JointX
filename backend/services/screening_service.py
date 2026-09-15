@@ -2,6 +2,7 @@
 from database.database import get_cursor
 from backend.utils.error_handler import JointXError
 from backend.utils.helpers import from_json, compute_bmi
+from backend.services.patient_service import decrypt_patient_row
 
 
 def start_screening(patient_id: int, performed_by: int, is_demo: bool = False) -> dict:
@@ -49,7 +50,8 @@ def get_full_screening_record(screening_id: int) -> dict:
 
     with get_cursor() as cur:
         cur.execute("SELECT * FROM patients WHERE id = ?", (screening["patient_id"],))
-        patient = dict(cur.fetchone() or {})
+        patient_row = cur.fetchone()
+        patient = decrypt_patient_row(patient_row) if patient_row else {}
         if patient:
             patient["bmi"] = compute_bmi(patient.get("height_cm"), patient.get("weight_kg"))
 

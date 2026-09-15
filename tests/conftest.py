@@ -2,6 +2,12 @@ import os
 import tempfile
 
 import pytest
+from cryptography.fernet import Fernet
+
+# Generated once per test session (not per-test) so every test in a run
+# shares the same key -- never used outside tests. Real deployments generate
+# their own via docs/KEY_MANAGEMENT.md and never share this value.
+_TEST_DATA_KEY = Fernet.generate_key().decode()
 
 
 @pytest.fixture
@@ -10,6 +16,10 @@ def app():
     os.close(fd)
     os.environ["JOINTX_DB_PATH"] = db_path
     os.environ["JOINTX_DEMO_MODE"] = "true"
+    # backend/utils/crypto.py reads this env var directly (not cached/frozen
+    # at import time), so setting it here is sufficient on its own -- unlike
+    # DATABASE_PATH/DEMO_MODE below, no Config-class-attribute patch is needed.
+    os.environ["JOINTX_DATA_KEY"] = _TEST_DATA_KEY
 
     # config.settings.Config is a class attribute frozen at first import time
     # (e.g. by ml/model_loader.py, which several tests import transitively
