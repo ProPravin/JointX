@@ -7,21 +7,38 @@
  * Language codes must match config/i18n.py:SUPPORTED_LANGUAGES.
  */
 window.JointXI18n = (function () {
+  // Coverage-aware language list (spec: P2 NER language closure #7) --
+  // labels state real coverage instead of implying every declared language
+  // is equally ready. Must stay in sync with config/i18n.py's
+  // LANGUAGE_CAPABILITIES (server-side source of truth).
   const LANGS = [
-    { code: 'en', label: 'English' },
-    { code: 'as', label: 'অসমীয়া (Assamese)' },
-    { code: 'bn', label: 'বাংলা (Bengali)' },
-    { code: 'brx', label: 'बड़ो (Bodo)' },
-    { code: 'mni', label: 'ꯃꯤꯇꯩ ꯂꯣꯟ (Meitei)' },
-    { code: 'kha', label: 'Khasi' },
-    { code: 'grt', label: 'Garo' },
-    { code: 'lus', label: 'Mizo' },
-    { code: 'nag', label: 'Nagamese' },
-    { code: 'ne', label: 'नेपाली (Nepali)' },
-    { code: 'kok', label: 'Kokborok' },
-    { code: 'hi', label: 'हिन्दी (Hindi)' },
-    { code: 'ta', label: 'தமிழ் (Tamil)' },
+    { code: 'en', label: 'English — 100%' },
+    { code: 'as', label: 'অসমীয়া (Assamese) — 100%' },
+    { code: 'kha', label: 'Khasi — 100%' },
+    { code: 'lus', label: 'Mizo ṭawng — 100%' },
+    { code: 'bn', label: 'বাংলা (Bengali) — 100%' },
+    { code: 'ne', label: 'नेपाली (Nepali) — 100%' },
+    { code: 'hi', label: 'हिन्दी (Hindi) — 100%' },
+    { code: 'ta', label: 'தமிழ் (Tamil) — 100% — accessibility, not NER' },
+    { code: 'brx', label: 'बड़ो (Bodo) — partial' },
+    { code: 'mni', label: 'ꯃꯤꯇꯩ ꯂꯣꯟ (Meitei) — partial' },
+    { code: 'grt', label: 'A·chik (Garo) — partial' },
+    { code: 'nag', label: 'Nagamese — partial' },
+    { code: 'kok', label: 'Kokborok — partial' },
   ];
+
+  // Risk labels, disclaimers, and escalation text -- never served in a
+  // language outside CLINICALLY_VERIFIED_LANGS even if a translation
+  // exists in T (spec: "draft disclaimers are never served"). Must match
+  // config/i18n.py's CLINICAL_CRITICAL_KEYS / CLINICALLY_VERIFIED_LANGUAGES.
+  const CLINICAL_CRITICAL_KEYS = new Set([
+    'common.low', 'common.moderate', 'common.high',
+    'footer.disclaimer',
+    'results.proceed_review',
+    'report.finalize_success',
+  ]);
+  const CLINICALLY_VERIFIED_LANGS = new Set(['en', 'hi', 'bn', 'as', 'ne', 'ta']);
+  const PENDING_REVIEW_SUFFIX = ' (English — translation pending clinical review)';
 
   const T = {
     en: {
@@ -497,20 +514,96 @@ window.JointXI18n = (function () {
     'common.low': 'ꯂꯣꯋ', 'common.moderate': 'ꯃꯦꯗꯤꯌꯝ', 'common.high': 'ꯍꯥꯏ', 'common.pending': 'ꯊꯥꯕꯛ',
     'common.language': 'ꯂꯣꯟ',
   };
+  // Khasi (kha) -- FULL coverage (spec: P2 NER language closure #7). Latin
+  // script, no font/shaping work needed. Translated with English technical
+  // loanwords retained where that reflects real field usage (e.g. "camera",
+  // "screening", "IMU") rather than forcing an unnatural coinage.
+  // IMPORTANT: text_status FULL here means every UI key has a draft
+  // translation -- it does NOT mean clinical-critical content (risk level
+  // names, disclaimers, escalation text) is servable. Those specific keys
+  // still require a second-person clinical review flag (see
+  // config/i18n.py CLINICAL_CRITICAL_KEYS / translations verification
+  // workflow) before this module will serve them instead of the English
+  // original + a "translation pending review" badge.
   T.kha = {
     'nav.dashboard': 'Dashboard', 'nav.patients': 'Ki nongpang', 'nav.referrals': 'Ki jingpynphai',
     'nav.devices': 'Ka kyrdan tiar', 'nav.new_patient': '+ Nongpang thymmai', 'nav.logout': 'Log out',
+    'nav.guidance': 'Jingpynshiah jong ka jingiathuh',
     'brand.tagline': 'Jingma OA screening',
     'footer.disclaimer': 'Ka JointX ka ai ka jingkyrshan screening nyngkong jong ka jingma OA bad ym pynlong ïa ka jingpeit klinikal jong u doktor.',
-    'login.title': 'JointX', 'login.username': 'Ka username', 'login.password': 'Password', 'login.button': 'Rung hapoh',
-    'login.demo_hint': 'Demo login nyngkong: admin / changeme123',
+
+    'login.title': 'JointX', 'login.subtitle': 'Jingtip nyngkong jong ki jingma OA da ka AI',
+    'login.username': 'ID jong u nongsakhi', 'login.password': 'Password / PIN', 'login.button': 'Rung hapoh',
+    'login.role': 'Jingpang',
+    'login.portal_notice_title': 'Portal ha jingpang:',
+    'login.portal_notice_body': 'Ki nongsakhi ki pyndep ïa ka screening; ki doktor/nongpeit ki peit ïa ki case ba la sla; ki nongpule ki jied ïa ka system.',
+    'login.no_account': 'Thymmai ha bynta?', 'login.register_link': 'Register ïa ka account',
+    'role.worker': 'Nongsakhi', 'role.reviewer': 'Doktor / Nongpeit', 'role.admin': 'Nongpule',
+
+    'register.title': 'Register ïa ka Account', 'register.full_name': 'Bynames baroh',
+    'register.username': 'Pynthek ka username', 'register.password': 'Pynthek ka password',
+    'register.facility': 'Bynames jong ka facility (ym khlem don)',
+    'register.submit': 'Register', 'register.have_account': 'Don shibynta na kylla?', 'register.login_link': 'Rung hapoh',
+
     'dash.new_patient': '+ Nongpang thymmai', 'dash.stat_patients': 'Baroh nongpang',
     'dash.stat_screenings': 'Baroh screening', 'dash.stat_pending_referrals': 'Jingpynphai ba dang ap',
     'dash.stat_followup': 'Ki case follow-up', 'dash.stat_unsynced': 'Ki record ba ym la synoh',
     'dash.risk_distribution': 'Jingpynïap ka jingma', 'dash.recent_screenings': 'Ki screening dang shen',
     'dash.col_patient': 'Nongpang', 'dash.col_date': 'Sngi', 'dash.col_risk': 'Jingma',
+
     'common.low': 'Rit', 'common.moderate': 'Hapdeng', 'common.high': 'Jur', 'common.pending': 'Dang ap',
+    'common.continue': 'Ïalade', 'common.save': 'Pynkhreh', 'common.cancel': 'Khih',
     'common.language': 'Ktien',
+    'conn.online': 'Internet: Online', 'conn.offline': 'Internet: Offline',
+
+    'q.title': 'Kylli-kylla ïa ka OA screening',
+    'q.step_questionnaire': '1. Kylli-kylla', 'q.step_gait': '2. Jingïalam test', 'q.step_imu': '3. IMU test',
+    'q.step_functional': '4. Ki functional test', 'q.step_results': '5. Ki jubab',
+    'q.pain_score': 'Score jong ka jingkhuh (0–10)', 'q.stiffness_score': 'Score jong ka jingtylli (0–10)',
+    'q.mobility_difficulty': 'Kaba khuh ban leit-shai (0–10)', 'q.walking_difficulty': 'Kaba khuh ban ïalam (0–10)',
+    'q.stairs_difficulty': 'Kaba khuh ban khie step (0–10)', 'q.standing_difficulty': 'Kaba khuh ban ïap (0–10)',
+    'q.sit_to_stand_difficulty': 'Kaba khuh ban ïap na ka jingshong (0–10)',
+    'q.previous_joint_problems': 'Ki jingdum jong ka joint ha kylla', 'q.lifestyle_notes': 'Jingiaseng bad jingmut',
+    'q.submit': 'Pynkhreh bad ïalade sha ka jingsngew jong ka camera',
+
+    'gait.title': 'Camera Gait Test',
+    'gait.instructions': 'Pynshong ïa u nongpang na ka jaka ba ïoh peit baroh ka met, ban ïalam ha kylleng jrong ha kylleng jong ka camera, kata katta pyndep ka test.',
+    'gait.enable_camera': 'Pynlong ka camera preview', 'gait.run_test': 'Pyndep ka gait test',
+    'gait.complete': 'La leit shuh ka gait test', 'gait.cadence': 'Cadence', 'gait.asymmetry': 'Jingdum lympung-lyngkha',
+    'gait.knee_rom': 'ROM jong u long', 'gait.stride_time': 'Sngi jong ka stride', 'gait.continue_imu': 'Ïalade sha ka IMU test',
+
+    'imu.title': 'Dual IMU Movement Test',
+    'imu.instructions1': 'Pyndon shisien MPU6050 sensor ha rukom junior bad longsan (kaba shyngkha bad kaba lympung).',
+    'imu.instructions2': 'Calibrate te ha u nongpang ba ïap shibud.',
+    'imu.instructions3': 'Peit ïa u nongpang ban pyndep shibiej jingïalam/jingkhih-long.',
+    'imu.calibrate': '1. Calibrate', 'imu.run_test': '2. Pyndep ka movement test', 'imu.calibrated': 'La calibrate ✓',
+    'imu.complete': 'La leit shuh ka IMU test', 'imu.angular_velocity': 'RMS jong ka angular velocity',
+    'imu.joint_rom': 'ROM jong ka joint', 'imu.smoothness': 'Jingbha jong ka jingïalam',
+    'imu.cycle_duration': 'Sngi jong ka cycle', 'imu.continue_functional': 'Ïalade sha ki functional test',
+
+    'func.title': 'Ki Functional Screening Task',
+    'func.instructions': 'Pyndep baroh ki task rit ha jrong. Ki saw dei ban pyndep ha katno pat jingdon.',
+    'func.sit_to_stand_title': '1. Shong-ïap',
+    'func.sit_to_stand_desc': 'Peit ïa u nongpang ban ïap na ka pyrshah bad shong bnai (IMU ha ar rukom).',
+    'func.squat_title': '2. Squat', 'func.squat_desc': 'Peit ïa u nongpang ban pyndep shibiej squat mynta ha kylleng jong ka camera.',
+    'func.balance_title': '3. Balance', 'func.balance_desc': 'Peit ïa u nongpang ban ïap shibud bad pynkhreh ka balance na kylli second.',
+    'func.turn_title': '4. Turn', 'func.turn_desc': 'Peit ïa u nongpang ban khih ha ka jaka lade.',
+    'func.run_sit_to_stand': 'Pyndep ka sit-to-stand test', 'func.run_squat': 'Pyndep ka squat test',
+    'func.run_balance': 'Pyndep ka balance test', 'func.run_turn': 'Pyndep ka turn test',
+    'func.continue_analysis': 'Ïalade sha ka analysis',
+
+    'results.title': 'Jubab jong ka jingma screening', 'results.risk_category': 'Rukom jingma',
+    'results.key_factors': 'Ki elemental na bakla', 'results.data_quality': 'Jingbha jong ka data',
+    'results.gait_quality': 'Jingbha jong ka gait data', 'results.imu_quality': 'Jingbha jong ka IMU data',
+    'results.functional_quality': 'La leit shuh ki functional test',
+    'results.proceed_review': 'Ïalade sha ka review jong u nongsakhi',
+    'results.increases_risk': 'ka pynsang ka jingma', 'results.decreases_risk': 'ka pynrit ka jingma',
+    'results.listen': 'Sngap',
+
+    'report.title': 'Report jong ka Screening', 'report.download_txt': 'Download .txt',
+    'report.download_pdf': 'Download PDF', 'report.finalize': 'Pynshuh bad pynïatylli sha ka sync queue',
+    'report.finalize_success': 'La leit shuh ka screening bad la pyntylli sha ka sync queue.',
+    'report.loading': 'Dang load ka report...',
   };
   T.grt = {
     'nav.dashboard': 'Dashboard', 'nav.patients': 'Ragipa', 'nav.referrals': 'Referral',
@@ -527,20 +620,87 @@ window.JointXI18n = (function () {
     'common.low': 'Kom', 'common.moderate': 'Madan', 'common.high': 'Mauja', 'common.pending': 'Thanggipa',
     'common.language': 'Katharang',
   };
+  // Mizo (lus) -- FULL coverage (spec: P2 NER language closure #7). Same
+  // clinical-critical verification caveat as Khasi above applies here.
   T.lus = {
     'nav.dashboard': 'Dashboard', 'nav.patients': 'Patient-te', 'nav.referrals': 'Referral-te',
     'nav.devices': 'Device dinhmun', 'nav.new_patient': '+ Patient thar', 'nav.logout': 'Chhuak',
+    'nav.guidance': 'Chah Enkawlna Kaihhruaina',
     'brand.tagline': 'OA risk screening',
     'footer.disclaimer': 'JointX hian OA risk screening nyngkong a pe a, professional clinical diagnosis a thlak thleng lo.',
-    'login.title': 'JointX', 'login.username': 'Username', 'login.password': 'Password', 'login.button': 'Lut rawh',
-    'login.demo_hint': 'Demo login: admin / changeme123',
+
+    'login.title': 'JointX', 'login.subtitle': 'AI hmangin OA risk marker hriat hmasak na',
+    'login.username': 'Health worker ID', 'login.password': 'Password / PIN', 'login.button': 'Lut rawh',
+    'login.role': 'Hna',
+    'login.portal_notice_title': 'Hna aia portal:',
+    'login.portal_notice_body': 'Health worker-ten screening an ti; Doktor/Reviewer-ten case chhawn tawh an enfiah leh; Admin-ten system an enkawl.',
+    'login.no_account': 'Thar nge i ni?', 'login.register_link': 'Account register rawh',
+    'role.worker': 'Health Worker', 'role.reviewer': 'Doktor / Reviewer', 'role.admin': 'Admin',
+
+    'register.title': 'Account Register', 'register.full_name': 'Hming Kimchang',
+    'register.username': 'Username thlang rawh', 'register.password': 'Password thlang rawh',
+    'register.facility': 'Facility hming (a ngai lo)',
+    'register.submit': 'Register', 'register.have_account': 'Account i nei tawh em?', 'register.login_link': 'Lut rawh',
+
     'dash.new_patient': '+ Patient thar', 'dash.stat_patients': 'Patient zawng zawng',
     'dash.stat_screenings': 'Screening zawng zawng', 'dash.stat_pending_referrals': 'Referral nghak mek',
     'dash.stat_followup': 'Follow-up case', 'dash.stat_unsynced': 'Sync loh record',
     'dash.risk_distribution': 'Risk darh dan', 'dash.recent_screenings': 'Screening thar',
     'dash.col_patient': 'Patient', 'dash.col_date': 'Ni', 'dash.col_risk': 'Risk',
+
     'common.low': 'Hniam', 'common.moderate': 'Lai', 'common.high': 'Sang', 'common.pending': 'Nghak mek',
+    'common.continue': 'Zir zel rawh', 'common.save': 'Dahkhawm rawh', 'common.cancel': 'Kalh rawh',
     'common.language': 'Ṭawng',
+    'conn.online': 'Internet: Online', 'conn.offline': 'Internet: Offline',
+
+    'q.title': 'OA Screening Zawhna',
+    'q.step_questionnaire': '1. Zawhna', 'q.step_gait': '2. Gait Test', 'q.step_imu': '3. IMU Test',
+    'q.step_functional': '4. Functional Test-te', 'q.step_results': '5. Chhuah',
+    'q.pain_score': 'Natna score (0–10)', 'q.stiffness_score': 'Har taka intih score (0–10)',
+    'q.mobility_difficulty': 'Awmna danglamna harsatna (0–10)', 'q.walking_difficulty': 'Kal harsatna (0–10)',
+    'q.stairs_difficulty': 'Chhungkaw kaltling harsatna (0–10)', 'q.standing_difficulty': 'Din harsatna (0–10)',
+    'q.sit_to_stand_difficulty': 'Thu leh din inthlak harsatna (0–10)',
+    'q.previous_joint_problems': 'Hmasa laia chah harsatna', 'q.lifestyle_notes': 'Nun dan leh thiltih chhinchhiahna',
+    'q.submit': 'Dahkhawm la Camera Setup ah kal rawh',
+
+    'gait.title': 'Camera Gait Test',
+    'gait.instructions': 'Patient chu a taksa vek hmuh theih tur ang zelin din tir la, camera hmaah kawng tlem chhun kalsak rawh, chutah chuan test tan rawh.',
+    'gait.enable_camera': 'Camera Preview Hawn rawh', 'gait.run_test': 'Gait Test Tih rawh',
+    'gait.complete': 'Gait Test Zo Tawh', 'gait.cadence': 'Cadence', 'gait.asymmetry': 'Voi lam leh dih lam inang lohna',
+    'gait.knee_rom': 'Khuk unau ROM', 'gait.stride_time': 'Kal kawng hun', 'gait.continue_imu': 'IMU Test ah zir zel rawh',
+
+    'imu.title': 'IMU Pahnih Kalsatna Test',
+    'imu.instructions1': 'Ke pahnih (voi lam leh dih lam) chungah MPU6050 sensor khatvin dah rawh.',
+    'imu.instructions2': 'Patient chu a inding fel laiin calibrate tih rawh.',
+    'imu.instructions3': 'Patient chu kal tlem emaw khuk kunna kalsatna tih tur tih sawi rawh.',
+    'imu.calibrate': '1. Calibrate', 'imu.run_test': '2. Kalsatna Test Tih rawh', 'imu.calibrated': 'Calibrate Zo ✓',
+    'imu.complete': 'IMU Test Zo Tawh', 'imu.angular_velocity': 'Angular velocity RMS',
+    'imu.joint_rom': 'Chah ROM', 'imu.smoothness': 'Kalsatna ṭhat dan',
+    'imu.cycle_duration': 'Cycle hun rei zat', 'imu.continue_functional': 'Functional Test-te ah zir zel rawh',
+
+    'func.title': 'Functional Screening Hna',
+    'func.instructions': 'Hnuaia hna tlemte hi tih zel rawh. Pali zawng hi eng dan pawhin tih theih a ni.',
+    'func.sit_to_stand_title': '1. Thu-Din',
+    'func.sit_to_stand_desc': 'Patient chu thutna aṭanga din a, thu leh tur tih sawi rawh (ke pahnih ah IMU).',
+    'func.squat_title': '2. Squat', 'func.squat_desc': 'Patient chu camera hmaah squat khatvin tihphah tur tih sawi rawh.',
+    'func.balance_title': '3. Insiam Reng Theihna', 'func.balance_desc': 'Patient chu a inding fel a, second tlem chhung insiam reng tur tih sawi rawh.',
+    'func.turn_title': '4. Kir Chhawn', 'func.turn_desc': 'Patient chu a dinna atangin kir chhawn tur tih sawi rawh.',
+    'func.run_sit_to_stand': 'Thu-Din Test Tih rawh', 'func.run_squat': 'Squat Test Tih rawh',
+    'func.run_balance': 'Insiam Reng Theihna Test Tih rawh', 'func.run_turn': 'Kir Chhawn Test Tih rawh',
+    'func.continue_analysis': 'Analysis ah zir zel rawh',
+
+    'results.title': 'Screening Risk Chhuah', 'results.risk_category': 'Risk Category',
+    'results.key_factors': 'Risk Chungthu Pawimawh Ber', 'results.data_quality': 'Data Ṭhatna',
+    'results.gait_quality': 'Gait Data Ṭhatna', 'results.imu_quality': 'IMU Data Ṭhatna',
+    'results.functional_quality': 'Functional Test Zo Tawh',
+    'results.proceed_review': 'Health Worker Review ah zir zel rawh',
+    'results.increases_risk': 'risk a tibik', 'results.decreases_risk': 'risk a titlem',
+    'results.listen': 'Ngaithla',
+
+    'report.title': 'Screening Report', 'report.download_txt': '.txt Download',
+    'report.download_pdf': 'PDF Download', 'report.finalize': 'Zo la Sync Queue-ah Thun',
+    'report.finalize_success': 'Screening a zo tawh a, sync queue-ah a thun tawh.',
+    'report.loading': 'Report load mek...',
   };
   T.nag = {
     'nav.dashboard': 'Dashboard', 'nav.patients': 'Patient-bilak', 'nav.referrals': 'Referral-bilak',
@@ -576,15 +736,33 @@ window.JointXI18n = (function () {
   const STORAGE_KEY = 'jointx_language';
   let currentLang = 'en';
 
+  function isClinicalCritical(key) {
+    return CLINICAL_CRITICAL_KEYS.has(key);
+  }
+
+  // RULE (spec: P2 #7): never silently fall back to English for clinical
+  // text without saying so. A clinical-critical key in a language that
+  // hasn't had second-person clinical review returns the English original
+  // WITH a visible marker -- the caller (apply()) is what actually shows
+  // the marker; t() alone just needs to never claim an unverified
+  // translation is safe to display standalone.
   function t(key) {
     const pack = T[currentLang] || T.en;
+    if (isClinicalCritical(key) && !CLINICALLY_VERIFIED_LANGS.has(currentLang)) {
+      return T.en[key] || key;
+    }
     return pack[key] || T.en[key] || key;
+  }
+
+  function isPendingClinicalReview(key) {
+    return isClinicalCritical(key) && !CLINICALLY_VERIFIED_LANGS.has(currentLang) && currentLang !== 'en';
   }
 
   function apply() {
     document.documentElement.lang = currentLang;
     document.querySelectorAll('[data-i18n]').forEach((el) => {
-      el.textContent = t(el.getAttribute('data-i18n'));
+      const key = el.getAttribute('data-i18n');
+      el.textContent = t(key) + (isPendingClinicalReview(key) ? PENDING_REVIEW_SUFFIX : '');
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
       el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
@@ -619,5 +797,8 @@ window.JointXI18n = (function () {
     });
   }
 
-  return { LANGS, t, setLang, init, get currentLang() { return currentLang; } };
+  return {
+    LANGS, t, setLang, init, isClinicalCritical, isPendingClinicalReview,
+    get currentLang() { return currentLang; },
+  };
 })();

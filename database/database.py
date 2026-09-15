@@ -150,6 +150,7 @@ _COLUMN_MIGRATIONS = {
     "patients": [
         ("full_name_hash", "TEXT"),
         ("contact_phone_hash", "TEXT"),
+        ("preferred_language", "TEXT"),
     ],
 }
 

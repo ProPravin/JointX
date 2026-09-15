@@ -39,9 +39,28 @@ CREATE TABLE IF NOT EXISTS patients (
     contact_phone       TEXT,
     contact_phone_hash  TEXT,   -- HMAC-SHA256(normalized contact_phone) -- exact-match lookup/dedup without decrypting
     facility_name       TEXT,   -- copied from the registering worker at creation time; used to scope Healthcare Worker access to their own facility
+    -- The PATIENT's own preferred language/script for reports and
+    -- messaging (spec: P2 #7) -- deliberately separate from the operating
+    -- worker's own UI language (config/i18n.py DEFAULT_LANGUAGE / a
+    -- worker's session language). A worker may operate the app in English
+    -- while the patient's printed report and any SMS/WhatsApp message goes
+    -- out in their own language. Defaults to the facility's configured
+    -- default language (see facility_languages table) at registration time.
+    preferred_language  TEXT,
     registered_by       INTEGER REFERENCES healthcare_workers(id),
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Facility-level default UI/report language, an explicit admin setting
+-- (spec: P2 #7 -- "for a Nagaland deployment the facility default is
+-- Nagamese, not Hindi"). One row per facility_name; absence means "use
+-- config/i18n.py's DEFAULT_LANGUAGE".
+CREATE TABLE IF NOT EXISTS facility_languages (
+    facility_name    TEXT PRIMARY KEY,
+    default_language TEXT NOT NULL,
+    updated_by       INTEGER REFERENCES healthcare_workers(id),
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS screenings (

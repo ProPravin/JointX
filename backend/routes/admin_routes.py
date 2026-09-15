@@ -5,9 +5,10 @@ RBAC #1/#3/#5). Every route here is @require_role("admin").
 from flask import Blueprint, request, session, jsonify
 
 from backend.utils.security import login_required, require_role
-from backend.utils.validators import require_fields
+from backend.utils.validators import require_fields, validate_choice
 from backend.utils.helpers import api_success
-from backend.services import admin_service, audit_service
+from backend.services import admin_service, audit_service, patient_service
+from config.i18n import LANGUAGE_CAPABILITIES, text_coverage_percent
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
@@ -70,3 +71,53 @@ def audit_log():
     action = request.args.get("action")
     limit = int(request.args.get("limit", 200))
     return jsonify(api_success(audit_service.list_audit_log(limit=limit, action=action)))
+
+
+@admin_bp.route("/facility-language", methods=["GET"])
+@login_required
+@require_role("admin")
+def get_facility_language():
+    """Facility-level default UI/report language (spec: P2 #7)."""
+    facility_name = request.args.get("facility_name")
+    if not facility_name:
+        return jsonify(api_success({"error": "facility_name query param required"})), 400
+    return jsonify(api_success({
+        "facility_name": facility_name,
+        "default_language": patient_service.get_facility_language(facility_name),
+    }))
+
+
+@admin_bp.route("/facility-language", methods=["PUT"])
+@login_required
+@require_role("admin")
+def set_facility_language():
+    data = request.get_json(force=True, silent=True) or {}
+    require_fields(data, ["facility_name", "default_language"])
+    validate_choice(data["default_language"], list(LANGUAGE_CAPABILITIES.keys()), "default_language")
+
+    patient_service.set_facility_language(data["facility_name"], data["default_language"], session["worker_id"])
+    audit_service.log_action(
+        session["worker_id"], "FACILITY_LANGUAGE_SET", "facility", None,
+        {"facility_name": data["facility_name"], "language": data["default_language"]},
+    )
+    return jsonify(api_success(message="Facility default language updated"))
+
+
+@admin_bp.route("/translation-coverage", methods=["GET"])
+@login_required
+@require_role("admin")
+def translation_coverage():
+    """Admin 'Translation Coverage' screen data (spec: P2 #7)."""
+    coverage = [
+        {
+            "code": code,
+            "endonym": cap["endonym"],
+            "english_name": cap["english_name"],
+            "text_status": cap["text_status"],
+            "coverage_percent": text_coverage_percent(code),
+            "is_ner": cap["is_ner"],
+            "accessibility_only": cap.get("accessibility_only", False),
+        }
+        for code, cap in LANGUAGE_CAPABILITIES.items()
+    ]
+    return jsonify(api_success(coverage))

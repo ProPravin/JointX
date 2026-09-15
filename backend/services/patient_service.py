@@ -15,8 +15,38 @@ from backend.utils.helpers import generate_patient_code, compute_bmi
 from backend.utils.validators import require_fields, validate_range, validate_sex
 from backend.utils.error_handler import JointXError
 from backend.utils import crypto
+from config.i18n import DEFAULT_LANGUAGE, facility_default_language
 
 ENCRYPTED_FIELDS = ("full_name", "contact_phone", "village_or_area")
+
+
+def get_facility_language(facility_name: str) -> str:
+    """
+    The admin-configured default language for a facility (spec: P2 #7),
+    falling back to the name-matching heuristic in config/i18n.py, then to
+    DEFAULT_LANGUAGE. Explicit admin configuration always wins over the
+    heuristic once it exists.
+    """
+    if facility_name:
+        with get_cursor() as cur:
+            cur.execute("SELECT default_language FROM facility_languages WHERE facility_name = ?", (facility_name,))
+            row = cur.fetchone()
+        if row:
+            return row["default_language"]
+    return facility_default_language(facility_name) or DEFAULT_LANGUAGE
+
+
+def set_facility_language(facility_name: str, language: str, updated_by: int):
+    with get_cursor(commit=True) as cur:
+        cur.execute(
+            """INSERT INTO facility_languages (facility_name, default_language, updated_by, updated_at)
+               VALUES (?, ?, ?, datetime('now'))
+               ON CONFLICT(facility_name) DO UPDATE SET
+                   default_language = excluded.default_language,
+                   updated_by = excluded.updated_by,
+                   updated_at = excluded.updated_at""",
+            (facility_name, language, updated_by),
+        )
 
 
 def decrypt_patient_row(row: dict) -> dict:
@@ -51,12 +81,20 @@ def create_patient(data: dict, registered_by: int) -> dict:
         worker_row = cur.fetchone()
     facility_name = worker_row["facility_name"] if worker_row else None
 
+    # Patient's own preferred language defaults to the facility's admin-set
+    # default (spec: P2 #7), not the registering worker's own UI language --
+    # a worker may operate in English while the patient's report/messages
+    # go out in the facility's local language. An explicit choice on the
+    # registration form always wins over the facility default.
+    preferred_language = data.get("preferred_language") or get_facility_language(facility_name)
+
     with get_cursor(commit=True) as cur:
         cur.execute(
             """INSERT INTO patients
                (patient_code, full_name, full_name_hash, age, sex, height_cm, weight_kg,
-                village_or_area, contact_phone, contact_phone_hash, facility_name, registered_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                village_or_area, contact_phone, contact_phone_hash, facility_name,
+                preferred_language, registered_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 patient_code,
                 crypto.encrypt_field(data["full_name"]),
@@ -69,6 +107,7 @@ def create_patient(data: dict, registered_by: int) -> dict:
                 crypto.encrypt_field(data.get("contact_phone")),
                 crypto.hash_field(data.get("contact_phone")),
                 facility_name,
+                preferred_language,
                 registered_by,
             ),
         )

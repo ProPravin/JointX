@@ -16,6 +16,10 @@ data/*.db-shm
 # Trained model artifacts (produced by training/train.py, not source code)
 ml/models/*.json
 
+# Synthetic pipeline-smoke-test output (training/pipeline_smoke_test.py) --
+# regenerated on demand, never a real model, never committed
+training/synthetic_only/
+
 # Local database backups (tools/backup_db.py) and the central server's own DB
 backups/
 *.backup

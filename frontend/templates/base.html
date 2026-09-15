@@ -12,6 +12,12 @@
 {% block extra_css %}{% endblock %}
 </head>
 <body>
+{% if no_trained_model and show_nav|default(true) %}
+<div class="banner banner-warning model-status-banner" role="alert">
+  No trained model is installed — every risk prediction comes from a transparent heuristic, not a fitted classifier.
+  <a href="/model-status">Read the full model status</a>.
+</div>
+{% endif %}
 {% if show_nav|default(true) %}
 <div class="corner">
   <select id="language-select" class="lang-select" data-i18n-lang-select aria-label="Language">

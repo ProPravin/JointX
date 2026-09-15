@@ -7,6 +7,7 @@ Run with:
 Runs on Raspberry Pi as well as any dev machine. Offline-first: no internet
 connection is required for any core screening functionality.
 """
+import os
 from datetime import timedelta
 
 from flask import Flask, render_template, session, redirect, url_for
@@ -81,6 +82,10 @@ def create_app():
             "role_label": label_for_role(role) if role else None,
             "ui_language": session.get("worker_language", DEFAULT_LANGUAGE),
             "supported_languages": SUPPORTED_LANGUAGES,
+            # Permanent, non-dismissible banner source (spec: P2 #8) -- true
+            # whenever no trained model file exists at Config.MODEL_PATH,
+            # which is always true in this repository today.
+            "no_trained_model": not os.path.exists(Config.MODEL_PATH),
         }
 
     # --- Page routes (server-rendered shell; JS in frontend/static/js
@@ -182,6 +187,14 @@ def create_app():
     @app.route("/device-status")
     def device_status_page():
         return render_template("device_status.html")
+
+    @app.route("/model-status")
+    def model_status_page():
+        """Renders docs/MODEL_STATUS.md -- single source of truth, not duplicated into a template (spec: P2 #8)."""
+        docs_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "MODEL_STATUS.md")
+        with open(docs_path, encoding="utf-8") as f:
+            content = f.read()
+        return render_template("model_status.html", content=content)
 
     @app.cli.command("create-admin")
     def create_admin_command():

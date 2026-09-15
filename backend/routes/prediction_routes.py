@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-from backend.services import feature_service, prediction_service, shap_service
+from backend.services import feature_service, prediction_service, shap_service, model_status_service
 from backend.utils.security import login_required
 from backend.utils.validators import require_fields
 from backend.utils.helpers import api_success
@@ -45,3 +45,15 @@ def get_prediction(screening_id):
 def get_shap(screening_id):
     result = shap_service.get_shap_explanation(screening_id)
     return jsonify(api_success(result))
+
+
+@prediction_bp.route("/model/performance", methods=["GET"])
+@login_required
+def model_performance():
+    """
+    Honest model evaluation status (spec: P2 #8). Returns
+    evaluation_available=False with an explanation when no real evaluation
+    has been run -- never a fabricated or placeholder number. See
+    docs/MODEL_STATUS.md.
+    """
+    return jsonify(api_success(model_status_service.get_model_performance()))
