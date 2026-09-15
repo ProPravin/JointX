@@ -224,6 +224,25 @@ async function sendReportVia(channel) {
   }
   await ensureReportData();
   const message = _reportFullText || 'JointX screening report could not be loaded.';
+
+  // Try a real server-side send first (Twilio, when the deployment has it
+  // configured) so delivery is actually tracked; only fall back to opening a
+  // deep link on this device if the server reports it isn't configured.
+  const res = await JointX.api(`/api/reports/${screeningId}/send`, 'POST', {
+    channel, to_phone: digits, message,
+  });
+
+  if (res.success && res.data.configured) {
+    document.getElementById('send-report-modal').classList.add('hidden');
+    alert('Report sent via ' + channel + '.');
+    return;
+  }
+  if (!res.success) {
+    document.getElementById('send-report-error').textContent = res.error || 'Send failed.';
+    return;
+  }
+
+  // Not configured server-side -- fall back to the device's own app.
   if (channel === 'whatsapp') {
     window.open(`https://wa.me/${digits.replace(/[^\d]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
   } else {

@@ -20,7 +20,12 @@ def push_batch(item: dict):
     if not Config.SYNC_ENDPOINT:
         return False, "Sync endpoint not configured"
 
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "X-Device-Id": Config.DEVICE_ID,
+        "X-Entity-Type": item["entity_type"],
+        "X-Entity-Id": str(item["entity_id"]),
+    }
     if Config.SYNC_API_KEY:
         headers["Authorization"] = f"Bearer {Config.SYNC_API_KEY}"
 

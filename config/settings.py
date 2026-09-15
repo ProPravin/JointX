@@ -12,3 +12,4 @@ _module = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_module)
 
 Config = _module.Config
+INSECURE_DEFAULT_SECRET_KEY = _module.INSECURE_DEFAULT_SECRET_KEY

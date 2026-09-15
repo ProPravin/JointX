@@ -38,6 +38,8 @@ logger = get_logger(__name__)
 
 
 def create_app():
+    Config.validate_for_production()
+
     app = Flask(
         __name__,
         template_folder="frontend/templates",

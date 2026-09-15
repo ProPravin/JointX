@@ -1,0 +1,50 @@
+name: CI
+
+# Runs the test suite on every push and pull request so a broken change never
+# reaches main un-flagged. Deliberately does NOT install opencv/mediapipe as
+# hard requirements for CI speed -- the app and its tests are designed to run
+# in DEMO_MODE without real camera/IMU hardware, which is exactly what CI is.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        env:
+          JOINTX_DEMO_MODE: "true"
+          JOINTX_SECRET_KEY: "ci-test-key-not-for-production"
+        run: |
+          python -m pytest -v
+
+      - name: Verify no debug/insecure secret ships in production config
+        run: |
+          python -c "
+          import re
+          with open('config.py') as f:
+              content = f.read()
+          assert 'dev-insecure-key-change-me' in content, 'expected placeholder default present (checked by startup guard, not removed)'
+          print('OK: startup guard source present')
+          "

@@ -1,0 +1,35 @@
+.env
+
+# Python virtual environment -- rebuilt from requirements.txt, never committed
+.venv/
+
+# Compiled Python bytecode
+__pycache__/
+*.pyc
+
+# Local database (contains real patient/worker data on a deployed instance)
+# -- WAL/SHM sidecar files carry uncommitted PHI too, never just the main file.
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Trained model artifacts (produced by training/train.py, not source code)
+ml/models/*.json
+
+# Local database backups (tools/backup_db.py) and the central server's own DB
+backups/
+*.backup
+central_server/central.db
+
+# Logs can contain request paths/identifiers -- never committed
+logs/
+*.log
+
+# Build artifacts -- see tools/make_release.sh; never hand-zip the working
+# directory, it captures .env/data/*.db/.venv even though git itself ignores
+# them (a zip has no concept of .gitignore).
+*.zip
+dist/
+
+# Claude Code's own local machine settings -- not part of the application
+.claude/

@@ -18,6 +18,13 @@ mediapipe==0.10.14
 # --- Testing ---
 pytest==8.3.2
 
+# --- Optional production integrations (Tier 1) ---
+# Uncomment whichever of these you actually configure via .env -- neither is
+# required to run JointX; both are lazy-imported only when their feature is
+# used (see backend/services/notification_service.py and tools/backup_db.py).
+# twilio==9.3.2       # real SMS/WhatsApp sending (JOINTX_TWILIO_*)
+# boto3==1.35.0       # off-device backup upload to S3 (JOINTX_BACKUP_S3_BUCKET)
+
 # NOTE for Raspberry Pi deployment:
 # - Use `opencv-python-headless` instead of `opencv-python` if no GUI/X server
 #   is present.
