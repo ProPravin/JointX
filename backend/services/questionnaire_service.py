@@ -4,7 +4,7 @@ any diagnosis/risk from questionnaire answers alone -- it only stores data
 for later use in multimodal fusion (see spec section 6).
 """
 from database.database import get_cursor
-from backend.utils.validators import require_fields, validate_range
+from backend.utils.validators import require_fields, validate_range, ValidationError
 
 
 QUESTIONNAIRE_FIELDS = [
@@ -23,6 +23,8 @@ def submit_questionnaire(screening_id: int, data: dict) -> dict:
     for field in QUESTIONNAIRE_FIELDS:
         if field in data:
             validate_range(data.get(field), 0, 10, field)
+    if data.get("habitual_squatting") not in (0, 1, None):
+        raise ValidationError("habitual_squatting must be 0, 1, or omitted")
 
     with get_cursor(commit=True) as cur:
         cur.execute("DELETE FROM questionnaire WHERE screening_id = ?", (screening_id,))
@@ -30,8 +32,8 @@ def submit_questionnaire(screening_id: int, data: dict) -> dict:
             """INSERT INTO questionnaire
                (screening_id, pain_score, stiffness_score, mobility_difficulty,
                 walking_difficulty, stairs_difficulty, standing_difficulty,
-                sit_to_stand_difficulty, previous_joint_problems, lifestyle_notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                sit_to_stand_difficulty, habitual_squatting, previous_joint_problems, lifestyle_notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 screening_id,
                 data.get("pain_score", 0),
@@ -41,6 +43,7 @@ def submit_questionnaire(screening_id: int, data: dict) -> dict:
                 data.get("stairs_difficulty", 0),
                 data.get("standing_difficulty", 0),
                 data.get("sit_to_stand_difficulty", 0),
+                data.get("habitual_squatting"),
                 data.get("previous_joint_problems", ""),
                 data.get("lifestyle_notes", ""),
             ),

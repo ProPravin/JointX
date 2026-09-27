@@ -15,7 +15,7 @@ gait analysis (MediaPipe), patient-reported screening fields, and four short
 functional tasks (sit-to-stand, squat, balance, turn).
 """
 
-SCHEMA_VERSION = "3.0"
+SCHEMA_VERSION = "3.1"
 
 # Ordered list of (feature_name, source) — source is informational only.
 FEATURE_SCHEMA = [
@@ -43,6 +43,14 @@ FEATURE_SCHEMA = [
     ("pain_score", "patient"),
     ("stiffness_score", "patient"),
     ("mobility_score", "patient"),
+    # Habitual squatting (0/1) -- much of rural NER squats routinely for
+    # work/domestic tasks, raising baseline knee flexion ROM well above
+    # published Western normative values. Included so the model can learn
+    # this context rather than reading normal-for-this-population ROM as
+    # pathological; see config/model_config.py for the normative-data
+    # provisionality note and validation/subgroups.py for the fairness
+    # audit this feature enables (spec: subgroup/fairness audit).
+    ("habitual_squatting", "patient"),
     # Functional tests (functional/feature_extraction.py)
     ("sit_to_stand_time", "functional"),
     ("squat_rom", "functional"),

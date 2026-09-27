@@ -32,6 +32,7 @@ CLIP_BOUNDS = {
     "pain_score": (0, 10),
     "stiffness_score": (0, 10),
     "mobility_score": (0, 10),
+    "habitual_squatting": (0, 1),
     # Functional
     "sit_to_stand_time": (0, 60),
     "squat_rom": (0, 120),

@@ -3,7 +3,35 @@ from database.database import get_cursor
 from backend.utils.error_handler import JointXError
 from backend.utils.helpers import from_json
 from ml.predictor import predict_risk
+from validation import calibration
 from config.model_config import MIN_FEATURE_BLOCKS_PRESENT, MIN_OVERALL_CAPTURE_QUALITY
+
+
+def _apply_calibration_gate(result: dict) -> dict:
+    """
+    CALIBRATION GATE (spec: numeric score honesty) -- a raw model/heuristic
+    confidence is not a calibrated probability. A numeric score is only
+    ever returned when a calibrator has actually been fit AND its Brier
+    score passes the threshold (validation/calibration.py); otherwise the
+    API returns the risk BAND ONLY and result["risk_score"] is None, which
+    the UI (results.html) already renders as "no score" rather than "0".
+    Today, no calibrator has ever been fit in this repository (no real
+    model exists to calibrate), so this always clears risk_score -- that is
+    the correct, honest behaviour, not a bug.
+    """
+    if result.get("risk_score") is None:
+        return result
+
+    meta = calibration.load_calibrator_meta()
+    if not meta.get("exists") or not meta.get("gate_passed"):
+        result["risk_score"] = None
+        return result
+
+    try:
+        result["risk_score"] = calibration.calibrated_score(result["risk_score"])
+    except Exception:  # noqa: BLE001 -- never let a calibration lookup crash a prediction
+        result["risk_score"] = None
+    return result
 
 
 def _refusal_check(features: dict) -> str:
@@ -62,6 +90,7 @@ def run_prediction(screening_id: int) -> dict:
         new_status = "REFUSED"
     else:
         result = predict_risk(features)
+        result = _apply_calibration_gate(result)
         result["refused"] = False
         result["refusal_reason"] = None
         new_status = "PREDICTED"

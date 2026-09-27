@@ -152,6 +152,12 @@ _COLUMN_MIGRATIONS = {
         ("contact_phone_hash", "TEXT"),
         ("preferred_language", "TEXT"),
     ],
+    "screenings": [
+        ("device_id", "TEXT"),
+    ],
+    "questionnaire": [
+        ("habitual_squatting", "INTEGER"),
+    ],
 }
 
 

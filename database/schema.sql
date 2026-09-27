@@ -68,8 +68,13 @@ CREATE TABLE IF NOT EXISTS screenings (
     patient_id          INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     performed_by        INTEGER REFERENCES healthcare_workers(id),
     status              TEXT NOT NULL DEFAULT 'IN_PROGRESS',
-        -- IN_PROGRESS / DATA_COLLECTED / PREDICTED / REVIEWED / COMPLETED / ABORTED
+        -- IN_PROGRESS / DATA_COLLECTED / PREDICTED / REVIEWED / COMPLETED / ABORTED / REFUSED
     is_demo             INTEGER NOT NULL DEFAULT 0,
+    -- Which physical field device captured this screening (Config.DEVICE_ID
+    -- at capture time) -- required to make leave-one-device-out evaluation
+    -- expressible as a query (spec: model validation -- without this,
+    -- multi-device validation can't be measured at all).
+    device_id           TEXT,
     started_at          TEXT NOT NULL DEFAULT (datetime('now')),
     completed_at        TEXT
 );
@@ -84,6 +89,10 @@ CREATE TABLE IF NOT EXISTS questionnaire (
     stairs_difficulty           INTEGER,       -- 0-10
     standing_difficulty         INTEGER,       -- 0-10
     sit_to_stand_difficulty     INTEGER,       -- 0-10
+    -- Much of rural NER squats routinely for work/domestic tasks, raising
+    -- baseline knee flexion ROM well above published Western normative
+    -- values (see config/model_config.py). 0/1, NULL if not asked.
+    habitual_squatting          INTEGER,
     previous_joint_problems     TEXT,
     lifestyle_notes             TEXT,
     created_at                  TEXT NOT NULL DEFAULT (datetime('now'))

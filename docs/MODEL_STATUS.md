@@ -53,6 +53,39 @@ complete and covered by the automated test suite:
 - **SHAP / explanation plumbing** (`ml/shap_explainer.py`) — falls back to a
   transparent heuristic contribution calculation when the `shap` package or
   a real model isn't available, same honesty rule as the prediction itself.
+- **Statistical rigor gates**, live and enforced today even though no real
+  model exists yet to be gated:
+  - **Calibration gate** (`validation/calibration.py`) — a numeric 0–100
+    score is only ever shown when a calibrator has actually been fit and
+    its Brier score passes threshold. No calibrator has ever been fit in
+    this repository, so today **every prediction shows the risk band only,
+    never a number** — verified live: a real screening run through the
+    full pipeline returns `risk_label: "MODERATE", risk_score: null`.
+  - **Minimum-N gate** (`validation/protocols.py`'s `minimum_n_gate()`) —
+    `evaluate.py` prefixes its output "STATISTICALLY UNRELIABLE — N TOO
+    SMALL" and `GET /api/model/performance` refuses to serve the numbers
+    below 40 subjects (or 10 in the minority class).
+  - **Repeated GroupKFold CV + bootstrap 95% CIs** (`validation/protocols.py`)
+    — every per-class sensitivity/specificity `evaluate.py` prints comes
+    with a confidence interval, never a bare point estimate.
+  - **Asymmetric misclassification cost** (`config/model_config.py`'s
+    `MISCLASSIFICATION_COST_MATRIX`, applied in `evaluate.py`) — a missed
+    HIGH is scored as 4x worse than a false MODERATE, and accuracy is
+    deliberately never printed or returned at all (misleading on an
+    imbalanced screening population).
+  - **Subgroup fairness audit** (`validation/subgroups.py`) — sensitivity
+    broken down by age band, sex, site, BMI band, and habitual-squatting
+    status, flagging any subgroup more than 15 percentage points below
+    overall as a deployment blocker.
+  - **Leave-one-site-out / leave-one-device-out** (`validation/protocols.py`)
+    — made queryable by `screenings.device_id` and `patients.facility_name`,
+    both populated automatically at capture time.
+  - **`habitual_squatting`** is now a real, captured questionnaire field and
+    model feature — rural NER squats routinely for work/domestic tasks,
+    raising baseline knee flexion ROM well above published Western
+    normative values; any threshold derived from that literature is
+    PROVISIONAL for this population until local normative data exists (see
+    `config/model_config.py`).
 
 ## What has to happen before a real model can exist
 

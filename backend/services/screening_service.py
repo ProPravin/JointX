@@ -3,6 +3,7 @@ from database.database import get_cursor
 from backend.utils.error_handler import JointXError
 from backend.utils.helpers import from_json, compute_bmi
 from backend.services.patient_service import decrypt_patient_row
+from config.settings import Config
 
 
 def start_screening(patient_id: int, performed_by: int, is_demo: bool = False) -> dict:
@@ -11,9 +12,9 @@ def start_screening(patient_id: int, performed_by: int, is_demo: bool = False) -
         if not cur.fetchone():
             raise JointXError("Patient not found", status_code=404)
         cur.execute(
-            """INSERT INTO screenings (patient_id, performed_by, status, is_demo)
-               VALUES (?, ?, 'IN_PROGRESS', ?)""",
-            (patient_id, performed_by, int(is_demo)),
+            """INSERT INTO screenings (patient_id, performed_by, status, is_demo, device_id)
+               VALUES (?, ?, 'IN_PROGRESS', ?, ?)""",
+            (patient_id, performed_by, int(is_demo), Config.DEVICE_ID),
         )
         screening_id = cur.lastrowid
     return get_screening(screening_id)

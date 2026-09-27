@@ -62,4 +62,17 @@ def get_model_performance() -> dict:
             "is_prototype": True,
         }
 
+    n_gate = results.get("minimum_n_gate")
+    if n_gate and not n_gate.get("passed"):
+        # MINIMUM-N GATE (spec: honest evaluation for small N) -- a real
+        # evaluation exists, but on too few subjects to trust. Refuse to
+        # serve it to the dashboard as if it were a reliable measurement;
+        # still name what exists so nobody thinks the endpoint is broken.
+        return {
+            "evaluation_available": False,
+            "reason": f"STATISTICALLY UNRELIABLE — N TOO SMALL: {n_gate.get('reason')}. "
+            "An evaluation was run, but not on enough subjects to report as a performance claim.",
+            "is_prototype": False,
+        }
+
     return {"evaluation_available": True, "is_prototype": False, **results}

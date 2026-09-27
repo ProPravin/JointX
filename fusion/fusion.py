@@ -115,6 +115,7 @@ def build_unified_features(gait: dict, imu: dict, questionnaire: dict, patient: 
         "pain_score": questionnaire.get("pain_score") if questionnaire else None,
         "stiffness_score": questionnaire.get("stiffness_score") if questionnaire else None,
         "mobility_score": mobility_score,
+        "habitual_squatting": questionnaire.get("habitual_squatting") if questionnaire else None,
         "sit_to_stand_time": functional.get("sit_to_stand_time"),
         "squat_rom": functional.get("squat_rom"),
         "balance_stability": functional.get("balance_stability"),

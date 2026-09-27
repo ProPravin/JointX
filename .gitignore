@@ -16,6 +16,12 @@ data/*.db-shm
 # Trained model artifacts (produced by training/train.py, not source code)
 ml/models/*.json
 
+# Fitted calibrator + reliability diagrams (derived from real training data,
+# never source code -- see validation/run_calibration_report.py)
+validation/models/*.pkl
+validation/models/*.json
+validation/reports/*.png
+
 # Synthetic pipeline-smoke-test output (training/pipeline_smoke_test.py) --
 # regenerated on demand, never a real model, never committed
 training/synthetic_only/
